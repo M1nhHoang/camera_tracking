@@ -1,0 +1,27 @@
+FROM camera_track_env
+
+# cd to folder
+WORKDIR /face_identify_service
+
+# setup file
+COPY face_identify_service/ .
+
+# install requirement
+RUN pip install --no-cache-dir -r requirements.txt
+
+# start app
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 8002 --reload"]
+
+### build vector db
+# build docker image
+## docker pull chromadb/chroma
+
+# build and run
+## docker run -it --name vector_db_service --net camera_track_network -v D:\camera\chromadb:/chroma/chroma -p 8000:8000 chromadb/chroma
+
+### build this service
+# build docker image
+## docker build -t face_identify . -f Dockerfile.face_identify
+
+# build and run
+## docker run --gpus all -it --name face_identify_service --net camera_track_network -v D:\camera\data\demo\face_identify_service:/face_identify_service -p 8002:8002 face_identify
