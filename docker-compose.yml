@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  database_service:
+    build:
+      context: .
+      dockerfile: Dockerfile.database
+    image: database
+    container_name: database_service
+    networks:
+      - camera_track_network
+    volumes:
+      - ./database_service:/database_service
+      - ./_static_files:/static_files
+    ports:
+      - "8003:8003"
+    command: ["python3", "main.py"]
+
+  mongo_db:
+    image: mongo
+    container_name: mongo_db
+    networks:
+      - camera_track_network
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./_data/mongo_data:/data/db
+
+  chroma_db:
+    image: chromadb/chroma
+    container_name: chroma_db
+    networks:
+      - camera_track_network
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./_data/chroma_data:/chroma/chroma
+
+networks:
+  camera_track_network:
+    external: true
+
+# docker-compose build --no-cache
+# docker-compose up 

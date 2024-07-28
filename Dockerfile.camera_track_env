@@ -1,0 +1,30 @@
+FROM nvidia/cuda:12.1.1-devel-ubuntu22.04
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+    apt-get install -y \
+    git \
+    python3-pip \
+    python3-dev \
+    libglib2.0-0 \
+    libgl1-mesa-glx \
+    ffmpeg \ 
+    libsm6 \ 
+    libxext6 \
+    tzdata
+
+# Set timezone
+ENV TZ=Asia/Ho_Chi_Minh
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+RUN date 
+
+# Install PyTorch and torchvision
+RUN python3 -m pip install --upgrade pip
+
+# build sample
+## docker build -t camera_track_env -f Dockerfile.camera_track_env . 
+
+# create network
+## docker network create camera_track_network

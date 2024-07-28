@@ -1,0 +1,29 @@
+FROM camera_track_env
+
+# cd to folder
+WORKDIR /database_service
+
+# setup file
+COPY database_service/ .
+
+# install requirement
+RUN pip install --no-cache-dir -r requirements.txt
+
+# start app
+CMD ["python3", "main.py"]
+# CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 8003 --reload"]
+
+### build this service
+# build docker image
+## docker build -t database . -f Dockerfile.database
+
+# build and run
+## docker run -it --name database_service --net camera_track_network -v D:\camera\data\demo\database_service:/database_service -p 5003:5003 database
+
+
+### build database
+# build docker image
+## docker pull mongo
+
+# build and run
+## docker run -it --name mongo_db  --net camera_track_network -p 27017:27017 -d mongo
