@@ -1,7 +1,0 @@
-ultralytics==8.2.56
-numpy==1.24.3
-opencv-python==4.10.0.84
-chromadb==0.5.4
-fastapi==0.111.0
-uvicorn==0.23.2
-requests==2.32.3

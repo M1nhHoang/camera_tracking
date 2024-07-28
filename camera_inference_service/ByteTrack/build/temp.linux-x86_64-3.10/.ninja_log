@@ -1,3 +1,0 @@
-# ninja log v5
-17	13196	1721230156633514500	/camera_inference_service/ByteTrack/build/temp.linux-x86_64-3.10/camera_inference_service/ByteTrack/yolox/layers/csrc/cocoeval/cocoeval.o	1bf3b2d06cfb0e9e
-22	15648	1721230159077939400	/camera_inference_service/ByteTrack/build/temp.linux-x86_64-3.10/camera_inference_service/ByteTrack/yolox/layers/csrc/vision.o	14cd837ae363efb0
