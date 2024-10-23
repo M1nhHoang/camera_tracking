@@ -3,6 +3,7 @@ import sys
 sys.path.append(".")
 
 import numpy as np
+import uvicorn
 
 from PIL import Image
 from io import BytesIO
@@ -21,3 +22,8 @@ async def get_embedding(file: UploadFile = File(...)):
     embedding = DeepFace.represent(image, model_name="VGG-Face")
 
     return {"embedding": embedding[0]["embedding"]}
+
+
+# run server
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8001, workers=2)

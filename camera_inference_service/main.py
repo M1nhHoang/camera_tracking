@@ -9,7 +9,8 @@ app = FastAPI()
 
 # ENV load
 camera_streams = {
-    "10.9.5.39": "rtsp://admin:12345abcde@10.9.5.39:554",
+    "video_feed": "D:/camera/data/output_video.avi"
+    # "10.9.5.39": "rtsp://admin:12345abcde@10.9.5.39:554",
     # "camera2": "rtsp://admin:12345abcde@10.9.5.40:554",
     # Add more cameras as needed
 }
@@ -53,4 +54,4 @@ async def camera_feed(request: Request, camera_name: str):
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=5000)

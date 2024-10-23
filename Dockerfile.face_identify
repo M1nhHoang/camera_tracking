@@ -10,7 +10,8 @@ COPY face_identify_service/ .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # start app
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 8002 --reload"]
+# CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 8002 --reload"]
+CMD ["python3", "main.py"]
 
 ### build vector db
 # build docker image
