@@ -11,7 +11,8 @@ RUN pip install --upgrade pip==23.3.1
 RUN pip install --no-cache-dir -r requirements.txt
 
 # start app
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 8001 --reload"]
+# CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 8001 --reload"]
+CMD ["python3", "main.py"]
 
 # build docker image
 ## docker build -t face_embedding . -f Dockerfile.face_embedding

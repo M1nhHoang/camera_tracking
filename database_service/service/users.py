@@ -1,38 +1,27 @@
-from database import MongoDBManager
+from database import RedisManager
 from utils import base64_to_image, save_image_to_folder
-from bson.objectid import ObjectId
-
-import cv2
 import time
+import uuid
 
 
 class UserService:
     def __init__(self):
-        self.db_manager = MongoDBManager(collection_name="users")
+        self.redis_manager = RedisManager()
         self.static_files = "static_files"
-        self.traking_id_cache = {}
-
-        # Create index
-        self.db_manager.get_collection().create_index("identifier", unique=True)
 
     def get_unkow_user_id(self):
-        user = self.db_manager.find_one({"username": "unknown"})
-        if not user:
+        unknown_user = self.redis_manager.find_one("users", {"username": "unknown"})
+        if not unknown_user:
             new_user = {
                 "identifier": "unknown",
                 "username": "unknown",
                 "created_at": time.strftime("%d-%m-%Y %H:%M:%S"),
             }
-            result = self.db_manager.insert_one(new_user)
-            return str(result.inserted_id)
-        return str(user["_id"])
+            return self.redis_manager.insert_one("users", new_user)
+        return unknown_user["_id"]
 
     def get_user_name_by_id(self, user_id):
-        if isinstance(user_id, ObjectId):
-            user = self.db_manager.find_one({"_id": user_id})
-        else:
-            user = self.db_manager.find_one({"_id": ObjectId(user_id)})
-
+        user = self.redis_manager.get_by_id("users", user_id)
         if not user:
             return "Not found user"
         return user["username"]
@@ -41,13 +30,12 @@ class UserService:
         if not username or not identifier or not face_images:
             return False
 
-        # conver face images
         face_images = [
             save_image_to_folder(base64_to_image(image), self.static_files)
             for image in face_images
         ]
 
-        user = self.db_manager.find_one({"identifier": identifier})
+        user = self.redis_manager.find_one("users", {"identifier": identifier})
         if not user:
             new_user = {
                 "username": username,
@@ -55,13 +43,13 @@ class UserService:
                 "face_images_path": face_images,
                 "created_at": time.strftime("%d-%m-%Y %H:%M:%S"),
             }
-            result = self.db_manager.insert_one(new_user)
-            return str(result.inserted_id), face_images  # return user id
+            user_id = self.redis_manager.insert_one("users", new_user)
         else:
-            for face_image in face_images:
-                self.db_manager.get_collection().update_one(
-                    {"identifier": user["identifier"]},
-                    {"$push": {"face_images_path": face_image}},
-                )
+            user_id = user["_id"]
+            self.redis_manager.update_one(
+                "users",
+                {"_id": user_id},
+                {"$push": {"face_images_path": {"$each": face_images}}},
+            )
 
-        return str(user["_id"]), face_images
+        return user_id, face_images

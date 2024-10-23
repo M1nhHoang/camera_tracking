@@ -16,6 +16,13 @@ services:
       - "8003:8003"
     command: ["python3", "main.py"]
 
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    networks:
+      - camera_track_network
+
   mongo_db:
     image: mongo
     container_name: mongo_db
