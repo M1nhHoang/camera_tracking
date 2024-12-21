@@ -85,10 +85,10 @@ def save_image_to_folder(image, folder_name, path=None):
 
     if path:
         image_path = os.path.join(folder_path, path)
-        cv2.imwrite(image_path, cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        cv2.imwrite(image_path, image)
     else:
         image_name = genarate_id() + ".jpg"
         image_path = os.path.join(folder_path, image_name)
-        cv2.imwrite(image_path, cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        cv2.imwrite(image_path, image)
 
     return os.path.basename(image_path) if path else image_name

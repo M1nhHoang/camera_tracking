@@ -148,6 +148,8 @@ class CameraInferenceService:
         prev_time = 0
 
         while cap.isOpened():
+            time.sleep(0.1)
+
             ret, frame = cap.read()
             if not ret:
                 break

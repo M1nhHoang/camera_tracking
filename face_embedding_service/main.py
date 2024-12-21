@@ -16,6 +16,7 @@ app = FastAPI()
 @app.post("/embed")
 async def get_embedding(file: UploadFile = File(...)):
     image = Image.open(BytesIO(await file.read()))
+    image = image.convert("RGB")
     image = np.array(image)
 
     # Perform embedding
@@ -26,4 +27,4 @@ async def get_embedding(file: UploadFile = File(...)):
 
 # run server
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8001, workers=2)
+    uvicorn.run("main:app", host="0.0.0.0", port=8001, workers=1)

@@ -62,6 +62,10 @@ class DetectedService:
 
             # Is better quality
             if is_better_quality(face_image, old_face_image) or force_update:
+                print(222222222222222222)
+                print(222222222222222222)
+                print(222222222222222222)
+                print(222222222222222222)
                 # overwrite image
                 save_image_to_folder(
                     face_image, self.static_files, path=old_face_image_path
@@ -86,13 +90,20 @@ class DetectedService:
                 )
 
         else:
+            print(1111111111111111)
+            print(1111111111111111)
+            print(1111111111111111)
+            print(1111111111111111)
+            print(1111111111111111)
             # save new record
             self.db_manager.insert_one(
                 {
                     "detect_id": tracking_id,
-                    "user_id": ObjectId(user_id)
-                    if user_id
-                    else UserService().get_unkow_user_id(),
+                    "user_id": (
+                        ObjectId(user_id)
+                        if user_id
+                        else UserService().get_unkow_user_id()
+                    ),
                     "guess_uesr_id": ObjectId(
                         UserService().get_unkow_user_id()
                     ),  # update later, save as similar user face
@@ -117,7 +128,10 @@ class DetectedService:
             return "Peding detect...", True
 
         detected = self.db_manager.find_one({"detect_id": tracking_id})
-        user_id = detected["user_id"]
+        if not detected:
+            return "Peding detect...", True
+
+        user_id = detected.get("user_id")
         user_name = UserService().get_user_name_by_id(user_id)
 
         return user_name, user_name == "unknown"

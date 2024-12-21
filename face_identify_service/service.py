@@ -59,12 +59,102 @@ class FaceIdentifyService:
         self.thread.daemon = True
         self.thread.start()
 
+    def create_face_embedding(
+        self, embedding_id: str, embedding: list, metadata: dict
+    ) -> bool:
+        """Add new face embedding to ChromaDB"""
+        try:
+            self.chroma_collection.add(
+                ids=[embedding_id], embeddings=[embedding], metadatas=[metadata]
+            )
+            return True
+        except Exception as e:
+            print(f"Error creating face embedding: {str(e)}")
+            return False
+
+    def get_face_embedding(self, embedding_id: str) -> dict:
+        """Get face embedding by ID"""
+        try:
+            result = self.chroma_collection.get(
+                ids=[embedding_id],
+                include=["metadatas"],  # Remove embeddings from include
+            )
+            if result["ids"]:
+                return {"id": result["ids"][0], "metadata": result["metadatas"][0]}
+            return None
+        except Exception as e:
+            print(f"Error getting face embedding: {str(e)}")
+            return None
+
+    def get_all_face_embeddings(self, limit: int = 100, offset: int = 0) -> list:
+        """Get all face embeddings with pagination"""
+        try:
+            result = self.chroma_collection.get(
+                limit=limit,
+                offset=offset,
+                include=["metadatas"],  # Remove embeddings from include
+            )
+
+            formatted_result = {"ids": result["ids"], "metadatas": result["metadatas"]}
+            return formatted_result
+        except Exception as e:
+            print(f"Error getting all face embeddings: {str(e)}")
+            return {"ids": [], "metadatas": []}
+
+    def update_face_embedding(
+        self, embedding_id: str, embedding: list, metadata: dict
+    ) -> bool:
+        """Update existing face embedding"""
+        try:
+            # ChromaDB doesn't have direct update, so delete and re-add
+            self.chroma_collection.delete(ids=[embedding_id])
+            self.chroma_collection.add(
+                ids=[embedding_id], embeddings=[embedding], metadatas=[metadata]
+            )
+            return True
+        except Exception as e:
+            print(f"Error updating face embedding: {str(e)}")
+            return False
+
+    def delete_face_embedding(self, embedding_id: str) -> bool:
+        """Delete face embedding"""
+        try:
+            self.chroma_collection.delete(ids=[embedding_id])
+            return True
+        except Exception as e:
+            print(f"Error deleting face embedding: {str(e)}")
+            return False
+
+    def search_similar_faces(self, query_embedding: list, n_results: int = 5) -> list:
+        """Search for similar face embeddings"""
+        try:
+            result = self.chroma_collection.query(
+                query_embeddings=[query_embedding],
+                n_results=n_results,
+                include=["metadatas", "distances"],  # Remove embeddings from include
+            )
+
+            # Convert numpy arrays to lists
+            formatted_result = {
+                "ids": result["ids"],
+                "metadatas": result["metadatas"],
+                "distances": [
+                    [float(d) for d in distance_list]
+                    for distance_list in result["distances"]
+                ],
+            }
+            return formatted_result
+        except Exception as e:
+            print(f"Error searching face embeddings: {str(e)}")
+            return {"ids": [], "metadatas": [], "distances": []}
+
     def process_detect_queue(
         self,
         detect_id,
         origin_image,
         detect_image,
-        threshold=0.8,
+        detect_threshold=1,
+        # threshold=1,
         force_update=False,
     ):
         self.detect_queue.put(
@@ -72,7 +162,7 @@ class FaceIdentifyService:
                 detect_id,
                 origin_image,
                 detect_image,
-                threshold,
+                detect_threshold,
                 force_update,
             )
         )
@@ -160,6 +250,7 @@ class FaceIdentifyService:
 
     def process_face_image_upload(self, user_info: dict, btye_image):
         image = Image.open(BytesIO(btye_image))
+        image = image.convert("RGB")
         image = np.array(image)
 
         face_image = self.face_validate(image)
@@ -248,7 +339,7 @@ class FaceIdentifyService:
                 detect_id,
                 origin_image,
                 detect_image,
-                threshold,
+                detect_threshold,
                 force_update,
             ) = track_queue
 
@@ -277,14 +368,16 @@ class FaceIdentifyService:
 
             # perform frame traking
             tracking_data = {
-                "user_id": metadata["user_id"] if distances < threshold else None,
+                "user_id": (
+                    metadata["user_id"] if distances < detect_threshold else None
+                ),
                 "detect_id": detect_id,
                 "origin_image": self.convert_image_to_base64(origin_image),
                 "detect_image": self.convert_image_to_base64(detect_image),
                 "face_image": self.convert_image_to_base64(face_image),
                 "truth_image_path": metadata["truth_image_path"],
                 "distance": distances,
-                "force_update": distances < threshold,
+                "force_update": distances < detect_threshold,
             }
             response = requests.post(
                 f"http://{self.database_name}:{self.database_port}/detected/tracking",

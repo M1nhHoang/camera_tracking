@@ -9,7 +9,7 @@ app = FastAPI()
 
 # ENV load
 camera_streams = {
-    "video_feed": "D:/camera/data/output_video.avi"
+    "video_feed": "demo_1.avi"
     # "10.9.5.39": "rtsp://admin:12345abcde@10.9.5.39:554",
     # "camera2": "rtsp://admin:12345abcde@10.9.5.40:554",
     # Add more cameras as needed
