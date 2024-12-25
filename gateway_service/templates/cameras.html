@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}Camera Management{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2>Camera Management</h2>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCameraModal">
+                Add Camera
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="row" id="cameraList">
+    <!-- Camera cards will be dynamically added here -->
+</div>
+
+<!-- Add Camera Modal -->
+<div class="modal fade" id="addCameraModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add New Camera</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addCameraForm">
+                    <div class="mb-3">
+                        <label for="cameraName" class="form-label">Camera Name</label>
+                        <input type="text" class="form-control" id="cameraName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="streamUrl" class="form-label">Stream URL</label>
+                        <input type="text" class="form-control" id="streamUrl" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="location" class="form-label">Location</label>
+                        <input type="text" class="form-control" id="location">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="submitCamera">Add Camera</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- View Camera Modal -->
+<div class="modal fade" id="viewCameraModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="viewCameraTitle">Camera View</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="camera-view-container">
+                    <img id="cameraViewStream" class="img-fluid w-100" alt="Camera Stream">
+                </div>
+                <div class="camera-info mt-3">
+                    <h6>Camera Information</h6>
+                    <table class="table">
+                        <tr>
+                            <th>Name:</th>
+                            <td id="viewCameraName"></td>
+                        </tr>
+                        <tr>
+                            <th>Location:</th>
+                            <td id="viewCameraLocation"></td>
+                        </tr>
+                        <tr>
+                            <th>Status:</th>
+                            <td id="viewCameraStatus"></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Load cameras on page load
+    loadCameras();
+
+    // Handle camera form submission
+    $('#submitCamera').click(function() {
+        const cameraData = {
+            name: $('#cameraName').val(),
+            stream_url: $('#streamUrl').val(),
+            location: $('#location').val()
+        };
+
+        $.ajax({
+            url: '/api/camera/add',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(cameraData),
+            success: function(response) {
+                $('#addCameraModal').modal('hide');
+                loadCameras();
+                $('#addCameraForm')[0].reset();
+            },
+            error: function(error) {
+                alert('Error adding camera');
+            }
+        });
+    });
+
+    // Handle modal close event
+    $('#viewCameraModal').on('hidden.bs.modal', function () {
+        stopCameraStream();
+    });
+});
+
+function loadCameras() {
+    $.get('/api/camera/list', function(cameras) {
+        const cameraList = $('#cameraList');
+        cameraList.empty();
+
+        cameras.forEach(camera => {
+            const card = `
+                <div class="col-md-4 mb-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">${camera.name}</h5>
+                            <p class="card-text">Location: ${camera.location || 'N/A'}</p>
+                            <div class="camera-stream cursor-pointer" onclick="viewCamera('${camera.id}', '${camera.name}')">
+                                <img src="/api/camera/${camera.id}/stream" class="img-fluid" alt="Camera Stream">
+                            </div>
+                            <div class="mt-3 d-flex justify-content-between">
+                                <div>
+                                    <button class="btn btn-danger btn-sm" onclick="deleteCamera('${camera.id}')">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </button>
+                                    ${camera.status === 'streaming' ? 
+                                        `<button class="btn btn-warning btn-sm" onclick="stopCamera('${camera.id}')">
+                                            <i class="fas fa-stop"></i> Stop
+                                        </button>` :
+                                        `<button class="btn btn-success btn-sm" onclick="startCamera('${camera.id}')">
+                                            <i class="fas fa-play"></i> Start
+                                        </button>`
+                                    }
+                                </div>
+                                <span class="badge ${camera.status === 'streaming' ? 'bg-success' : 'bg-secondary'}">
+                                    ${camera.status}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            cameraList.append(card);
+        });
+    });
+}
+
+let currentStreamInterval;
+
+function viewCamera(cameraId, cameraName) {
+    // Get camera details
+    $.get(`/api/camera/${cameraId}`, function(camera) {
+        $('#viewCameraTitle').text(camera.name);
+        $('#viewCameraName').text(camera.name);
+        $('#viewCameraLocation').text(camera.location || 'N/A');
+        $('#viewCameraStatus').text(camera.status);
+        
+        // Set up stream
+        const streamUrl = `/api/camera/${cameraId}/stream`;
+        $('#cameraViewStream').attr('src', streamUrl);
+        
+        // Show modal
+        $('#viewCameraModal').modal('show');
+        
+        // Set up periodic refresh of the stream
+        if (currentStreamInterval) {
+            clearInterval(currentStreamInterval);
+        }
+        
+        currentStreamInterval = setInterval(() => {
+            if ($('#viewCameraModal').is(':visible')) {
+                $('#cameraViewStream').attr('src', streamUrl + '?t=' + new Date().getTime());
+            }
+        }, 1000);
+    });
+}
+
+function stopCameraStream() {
+    if (currentStreamInterval) {
+        clearInterval(currentStreamInterval);
+        currentStreamInterval = null;
+    }
+}
+
+function startCamera(cameraId) {
+    $.post(`/api/camera/${cameraId}/start`, function() {
+        loadCameras();
+    }).fail(function(xhr) {
+        alert('Error starting camera: ' + xhr.responseJSON.detail);
+    });
+}
+
+function stopCamera(cameraId) {
+    $.post(`/api/camera/${cameraId}/stop`, function() {
+        loadCameras();
+    }).fail(function(xhr) {
+        alert('Error stopping camera: ' + xhr.responseJSON.detail);
+    });
+}
+
+function deleteCamera(cameraId) {
+    if (confirm('Are you sure you want to delete this camera?')) {
+        $.ajax({
+            url: `/api/camera/${cameraId}`,
+            type: 'DELETE',
+            success: function() {
+                loadCameras();
+            },
+            error: function(xhr) {
+                alert('Error deleting camera: ' + xhr.responseJSON.detail);
+            }
+        });
+    }
+}
+</script>
+
+<style>
+    .camera-view-container {
+        width: 100%;
+        max-height: 70vh;
+        overflow: hidden;
+        position: relative;
+        display: flex;
+        justify-content: center; /* Căn giữa theo chiều ngang */
+        align-items: center; /* Căn giữa theo chiều dọc */
+    }
+    
+    .camera-view-container img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: scale-down;
+    }
+    
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.cursor-pointer:hover {
+    opacity: 0.9;
+}
+</style>
+{% endblock %}

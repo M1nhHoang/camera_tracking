@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+
+{% block title %}Detection History{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 mb-4">
+        <h2>Detection History</h2>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <form id="filterForm" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="dateFrom" class="form-label">Date From</label>
+                        <input type="date" class="form-control" id="dateFrom">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="dateTo" class="form-label">Date To</label>
+                        <input type="date" class="form-control" id="dateTo">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="userId" class="form-label">User</label>
+                        <select class="form-control" id="userId">
+                            <option value="">All Users</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="filterBtn" class="form-label">&nbsp;</label>
+                        <button type="button" class="btn btn-primary form-control" id="filterBtn">Apply Filter</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>User</th>
+                                <th>Camera</th>
+                                <th>Confidence</th>
+                                <th>Images</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detectionList">
+                            <!-- Detection data will be dynamically added here -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="d-flex justify-content-center mt-3">
+                    <nav aria-label="Detection history pagination">
+                        <ul class="pagination" id="pagination">
+                            <!-- Pagination will be dynamically added here -->
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- View Detection Modal -->
+<div class="modal fade" id="viewDetectionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detection Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Original Image</h6>
+                        <img id="originalImage" class="img-fluid mb-3" alt="Original Image">
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Detected Face</h6>
+                        <img id="faceImage" class="img-fluid mb-3" alt="Detected Face">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <table class="table">
+                            <tr>
+                                <th>Detection Time:</th>
+                                <td id="detectionTime"></td>
+                            </tr>
+                            <tr>
+                                <th>User:</th>
+                                <td id="detectedUser"></td>
+                            </tr>
+                            <tr>
+                                <th>Camera:</th>
+                                <td id="detectionCamera"></td>
+                            </tr>
+                            <tr>
+                                <th>Confidence Score:</th>
+                                <td id="confidenceScore"></td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistics Modal -->
+<div class="modal fade" id="statisticsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detection Statistics</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6>Daily Detections</h6>
+                                <canvas id="dailyChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6>User Distribution</h6>
+                                <canvas id="userDistChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6>Camera Statistics</h6>
+                                <canvas id="cameraStatsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+$(document).ready(function() {
+    loadUsers();
+    loadDetections(1);
+    loadStatistics();
+
+    $('#filterBtn').click(function() {
+        loadDetections(1);
+    });
+});
+
+function loadUsers() {
+    $.get('/api/users/list', function(users) {
+        const userSelect = $('#userId');
+        users.forEach(user => {
+            userSelect.append(new Option(user.username, user._id));
+        });
+    });
+}
+
+function loadDetections(page) {
+    const filters = {
+        date_from: $('#dateFrom').val(),
+        date_to: $('#dateTo').val(),
+        user_id: $('#userId').val(),
+        page: page,
+        per_page: 10
+    };
+
+    $.get('/api/detect/list', {
+        date_from: $('#dateFrom').val(),
+        date_to: $('#dateTo').val(),
+        user_id: $('#userId').val(),
+        page: currentPage,
+        per_page: 10
+    }, function(response) {
+        const detectionList = $('#detectionList');
+        detectionList.empty();
+
+        response.detections.forEach(detection => {
+            const row = `
+                <tr>
+                    <td>${detection.time_stamp}</td>
+                    <td>${detection.user_name}</td>
+                    <td>${detection.camera_name}</td>
+                    <td>${(100 - detection.distance).toFixed(2)}%</td>
+                    <td>
+                        <button class="btn btn-info btn-sm" onclick="viewDetection('${detection._id}')">
+                            View Images
+                        </button>
+                    </td>
+                </tr>
+            `;
+            detectionList.append(row);
+        });
+
+        updatePagination(response.total_pages, page);
+    });
+}
+
+function updatePagination(totalPages, currentPage) {
+    const pagination = $('#pagination');
+    pagination.empty();
+
+    // Previous button
+    pagination.append(`
+        <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="loadDetections(${currentPage - 1})">Previous</a>
+        </li>
+    `);
+
+    // Page numbers
+    for (let i = 1; i <= totalPages; i++) {
+        pagination.append(`
+            <li class="page-item ${currentPage === i ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="loadDetections(${i})">${i}</a>
+            </li>
+        `);
+    }
+
+    // Next button
+    pagination.append(`
+        <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="loadDetections(${currentPage + 1})">Next</a>
+        </li>
+    `);
+}
+
+function viewDetection(detectionId) {
+    $.get(`/api/detect/${detectionId}`, function(detection) {
+        $('#originalImage').attr('src', `/static/${detection.origin_image_path}`);
+        $('#faceImage').attr('src', `/static/${detection.face_image_path}`);
+        $('#detectionTime').text(detection.time_stamp);
+        $('#detectedUser').text(detection.user_name);
+        $('#detectionCamera').text(detection.camera_name);
+        $('#confidenceScore').text(`${(100 - detection.distance).toFixed(2)}%`);
+        
+        $('#viewDetectionModal').modal('show');
+    });
+}
+
+function loadStatistics() {
+    const filters = {
+        date_from: $('#dateFrom').val(),
+        date_to: $('#dateTo').val()
+    };
+
+    // Load daily statistics
+    $.get('/api/detect/stats/daily', {
+        date_from: $('#dateFrom').val(),
+        date_to: $('#dateTo').val()
+    }, function(stats) {
+        const ctx = document.getElementById('dailyChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: stats.map(item => item.date),
+                datasets: [{
+                    label: 'Daily Detections',
+                    data: stats.map(item => item.count),
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    });
+
+    // Load user distribution
+    $.get('/api/detect/stats/users', function(stats) {
+        const ctx = document.getElementById('userDistChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: stats.map(item => item.user_name),
+                datasets: [{
+                    data: stats.map(item => item.count),
+                    backgroundColor: [
+                        'rgb(255, 99, 132)',
+                        'rgb(54, 162, 235)',
+                        'rgb(255, 206, 86)',
+                        'rgb(75, 192, 192)',
+                        'rgb(153, 102, 255)'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true
+            }
+        });
+    });
+
+    // Load camera statistics
+    $.get('/api/detect/stats/cameras', function(stats) {
+        const ctx = document.getElementById('cameraStatsChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: stats.map(item => item.camera_name),
+                datasets: [{
+                    label: 'Detections per Camera',
+                    data: stats.map(item => item.count),
+                    backgroundColor: 'rgb(75, 192, 192)'
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,93 @@
+/* General styles */
+body {
+    background-color: #f8f9fa;
+}
+
+/* Navbar customization */
+.navbar {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, .1);
+}
+
+/* Card styles */
+.card {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, .1);
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+/* Camera stream container */
+.camera-stream {
+    position: relative;
+    width: 100%;
+    padding-top: 56.25%;
+    /* 16:9 Aspect Ratio */
+    background-color: #000;
+    overflow: hidden;
+}
+
+.camera-stream img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Button spacing */
+.btn {
+    margin-right: 5px;
+}
+
+/* Modal customization */
+.modal-content {
+    border-radius: 8px;
+}
+
+.modal-header {
+    background-color: #f8f9fa;
+    border-radius: 8px 8px 0 0;
+}
+
+/* Form styling */
+.form-control:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, .25);
+}
+
+/* Alert styling */
+.alert {
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+/* Status indicators */
+.status-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 5px;
+}
+
+.status-online {
+    background-color: #28a745;
+}
+
+.status-offline {
+    background-color: #dc3545;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+    }
+
+    .card {
+        margin-bottom: 15px;
+    }
+}

@@ -1,57 +1,147 @@
 import threading
 import uvicorn
-from fastapi import FastAPI, Request
+import requests
+from fastapi import FastAPI, HTTPException
 from starlette.responses import StreamingResponse
+from typing import Dict, Optional
+from pydantic import BaseModel
 
 from service import CameraInferenceService
 
 app = FastAPI()
 
-# ENV load
-camera_streams = {
-    "video_feed": "demo_1.avi"
-    # "10.9.5.39": "rtsp://admin:12345abcde@10.9.5.39:554",
-    # "camera2": "rtsp://admin:12345abcde@10.9.5.40:554",
-    # Add more cameras as needed
-}
-database_serivce = {
-    "hostname": "database_service",
-    "port": "8003",
-}
-face_idtification_service = {
-    "hostname": "face_identify_service",
-    "port": "8002",
+# Service configurations
+services = {
+    "database_service": {"hostname": "database_service", "port": "8003"},
+    "face_identify_service": {"hostname": "face_identify_service", "port": "8002"},
 }
 model_path = "weights/yolo8n_human_detect.pt"
 
-# Create instances of CameraInferenceService for each camera
-camera_services = {
-    name: CameraInferenceService(
-        stream_url=url,
-        database_serivce=database_serivce,
-        face_idtification_service=face_idtification_service,
-        model_path=model_path,
-    )
-    for name, url in camera_streams.items()
-}
+# Store camera services
+camera_services = {}
+
+
+class CameraConfig(BaseModel):
+    camera_id: str
+    name: str
+    stream_url: str
+    location: Optional[str] = None
+    optimal_width: Optional[int] = 640
+    optimal_height: Optional[int] = 480
+    conf_threshold: Optional[float] = 0.7
+
+
+async def initialize_cameras():
+    """Initialize cameras from database when service starts"""
+    try:
+        # Get list of cameras from database service
+        response = requests.get(
+            f"http://{services['database_service']['hostname']}:{services['database_service']['port']}/cameras/list"
+        )
+
+        if response.status_code == 200:
+            cameras = response.json()
+            for camera in cameras:
+                # Create camera configuration
+                config = CameraConfig(
+                    camera_id=camera["id"],
+                    name=camera["name"],
+                    stream_url=camera["stream_url"],
+                    location=camera.get("location"),
+                )
+
+                # Create and store camera service
+                service = CameraInferenceService.create_from_config(
+                    config=config.model_dump(), services=services, model_path=model_path
+                )
+                camera_services[camera["id"]] = service
+
+                # Start camera if it was previously streaming
+                if camera.get("status") == "streaming":
+                    service.start()
+
+            print(f"Initialized {len(cameras)} cameras from database")
+        else:
+            print("Failed to get cameras from database")
+
+    except Exception as e:
+        print(f"Error initializing cameras: {str(e)}")
 
 
 @app.on_event("startup")
-def startup_event():
-    for name, service in camera_services.items():
-        video_thread = threading.Thread(target=service.video_stream, daemon=True)
-        video_thread.start()
+async def startup_event():
+    """Run initialization when FastAPI starts"""
+    await initialize_cameras()
 
 
-@app.get("/camera/{camera_name}")
-async def camera_feed(request: Request, camera_name: str):
-    if camera_name in camera_services:
-        return StreamingResponse(
-            camera_services[camera_name].video_feed(),
-            media_type="multipart/x-mixed-replace; boundary=frame",
+@app.post("/cameras/add")
+async def add_camera(config: CameraConfig):
+    """Add new camera to monitoring"""
+    try:
+        # Create camera service
+        service = CameraInferenceService.create_from_config(
+            config=config.model_dump(), services=services, model_path=model_path
         )
-    return {"error": "Camera not found"}
+
+        camera_services[config.camera_id] = service
+        return {"camera_id": config.camera_id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/cameras/{camera_id}")
+async def delete_camera(camera_id: str):
+    """Remove camera from monitoring"""
+    if camera_id not in camera_services:
+        raise HTTPException(status_code=404, detail="Camera not found")
+
+    # Stop camera service
+    camera_services[camera_id].stop()
+    del camera_services[camera_id]
+
+    return {"success": True}
+
+
+@app.get("/cameras/{camera_id}/stream")
+async def camera_feed(camera_id: str):
+    """Get camera video stream"""
+    if camera_id not in camera_services:
+        raise HTTPException(status_code=404, detail="Camera not found")
+
+    return StreamingResponse(
+        camera_services[camera_id].video_feed(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+    )
+
+
+@app.post("/cameras/{camera_id}/start")
+async def start_camera(camera_id: str):
+    """Start camera streaming"""
+    if camera_id not in camera_services:
+        raise HTTPException(status_code=404, detail="Camera not found")
+
+    camera_services[camera_id].start()
+    return {"success": True}
+
+
+@app.post("/cameras/{camera_id}/stop")
+async def stop_camera(camera_id: str):
+    """Stop camera streaming"""
+    if camera_id not in camera_services:
+        raise HTTPException(status_code=404, detail="Camera not found")
+
+    camera_services[camera_id].stop()
+    return {"success": True}
+
+
+@app.get("/cameras/{camera_id}/status")
+async def camera_status(camera_id: str):
+    """Get camera status"""
+    if camera_id not in camera_services:
+        raise HTTPException(status_code=404, detail="Camera not found")
+
+    return {"status": camera_services[camera_id].get_status()}
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=5000)
+    uvicorn.run("main:app", host="0.0.0.0", port=5000)
