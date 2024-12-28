@@ -154,7 +154,7 @@ class FaceIdentifyService:
         origin_image,
         detect_image,
         detect_threshold=1,
-        # threshold=1,
+        camera_id=None,
         force_update=False,
     ):
         self.detect_queue.put(
@@ -163,6 +163,7 @@ class FaceIdentifyService:
                 origin_image,
                 detect_image,
                 detect_threshold,
+                camera_id,
                 force_update,
             )
         )
@@ -182,6 +183,7 @@ class FaceIdentifyService:
             json=data,
         )
 
+        print(response.text)
         if response.status_code != 200:
             logging.error("Error when connecting to database server")
             raise ValueError("Error when connecting to database server")
@@ -200,9 +202,9 @@ class FaceIdentifyService:
 
     def face_validate(self, detect_image):
         face_images = self.face_detect(detect_image, is_counter=True)
-        if len(face_images) != 1:
-            logging.error("Must be only one face in your image.")
-            raise ValueError("Must be only one face in your image.")
+        # if len(face_images) != 1:
+        #     logging.error("Must be only one face in your image.")
+        #     raise ValueError("Must be only one face in your image.")
 
         face_image = face_images[0]
         if self.is_image_quality(face_image, 500) is False:
@@ -340,6 +342,7 @@ class FaceIdentifyService:
                 origin_image,
                 detect_image,
                 detect_threshold,
+                camera_id,
                 force_update,
             ) = track_queue
 
@@ -372,6 +375,7 @@ class FaceIdentifyService:
                     metadata["user_id"] if distances < detect_threshold else None
                 ),
                 "detect_id": detect_id,
+                "camera_id": camera_id,
                 "origin_image": self.convert_image_to_base64(origin_image),
                 "detect_image": self.convert_image_to_base64(detect_image),
                 "face_image": self.convert_image_to_base64(face_image),

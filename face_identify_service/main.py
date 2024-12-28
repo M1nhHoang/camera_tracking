@@ -1,5 +1,5 @@
 import uvicorn
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.responses import JSONResponse
 from typing import Optional, List
 from pydantic import BaseModel
@@ -31,6 +31,7 @@ async def face_identification(
     origin_image: UploadFile = File(...),
     detect_image: UploadFile = File(...),
     detect_id: int = -1,
+    camera_id: Optional[str] = None,
 ):
     if detect_id == -1:
         raise HTTPException(status_code=400, detail="Detect id is required.")
@@ -44,7 +45,9 @@ async def face_identification(
     origin_image = np.array(origin_image)
     detect_image = np.array(detect_image)
 
-    face_identify_service.process_detect_queue(detect_id, origin_image, detect_image)
+    face_identify_service.process_detect_queue(
+        detect_id, origin_image, detect_image, camera_id=camera_id
+    )
 
     return {"success": True}
 
@@ -52,16 +55,23 @@ async def face_identification(
 @app.post("/face_upload")
 async def face_upload(
     file: UploadFile = File(...),
-    identifier: str = "",
-    user_name: str = "",
+    identifier: str = Form(...),
+    user_name: str = Form(...),
 ):
+    """Upload face image with user info via form-data"""
     try:
+        # Đọc nội dung file
+        file_content = await file.read()
+
+        # Process face image upload
         face_identify_service.process_face_image_upload(
-            {"identifier": identifier, "user_name": user_name}, await file.read()
+            {"identifier": identifier, "user_name": user_name}, file_content
         )
+
         return {"success": True}
+
     except Exception as e:
-        print(e)
+        print(f"Error in face_upload: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

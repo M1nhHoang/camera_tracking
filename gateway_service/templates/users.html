@@ -41,7 +41,7 @@
 
 <!-- Add User Modal -->
 <div class="modal fade" id="addUserModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Add New User</h5>
@@ -49,20 +49,27 @@
             </div>
             <div class="modal-body">
                 <form id="addUserForm">
-                    <div class="mb-3">
-                        <label for="userName" class="form-label">User Name</label>
-                        <input type="text" class="form-control" id="userName" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="userIdentifier" class="form-label">Identifier</label>
-                        <input type="text" class="form-control" id="userIdentifier" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="userImage" class="form-label">Face Image</label>
-                        <input type="file" class="form-control" id="userImage" accept="image/*" required>
-                    </div>
-                    <div class="mb-3">
-                        <img id="imagePreview" class="img-fluid d-none" alt="Preview">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="userName" class="form-label">User Name</label>
+                                <input type="text" class="form-control" id="userName" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="userIdentifier" class="form-label">Identifier</label>
+                                <input type="text" class="form-control" id="userIdentifier" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="userImages" class="form-label">Face Images</label>
+                                <input type="file" class="form-control" id="userImages" accept="image/*" multiple required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Image Previews</label>
+                            <div id="imagePreviewContainer" class="row g-2">
+                                <!-- Image previews will be added here -->
+                            </div>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -83,9 +90,55 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="row" id="userImages">
+                <div class="row" id="_userImages">
                     <!-- User images will be displayed here -->
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editUserForm">
+                    <input type="hidden" id="editUserId">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editUserName" class="form-label">User Name</label>
+                                <input type="text" class="form-control" id="editUserName" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="editUserIdentifier" class="form-label">Identifier</label>
+                                <input type="text" class="form-control" id="editUserIdentifier" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="editUserImage" class="form-label">Add New Face Image</label>
+                                <input type="file" class="form-control" id="editUserImage" accept="image/*">
+                            </div>
+                            <div class="mb-3">
+                                <img id="editImagePreview" class="img-fluid d-none" alt="Preview">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Current Face Images</h6>
+                            <div id="currentFaceImages" class="row g-2">
+                                <!-- Face images will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="submitEditUser">Save Changes</button>
             </div>
         </div>
     </div>
@@ -96,6 +149,127 @@
 <script>
 $(document).ready(function() {
     loadUsers();
+
+    function editUser(userId) {
+        // Get user details and populate form
+        $.get(`/api/users/${userId}`, function(user) {
+            $('#editUserId').val(userId);
+            $('#editUserName').val(user.username);
+            $('#editUserIdentifier').val(user.identifier);
+            
+            // Reset image preview and file input
+            $('#editImagePreview').addClass('d-none');
+            $('#editUserImage').val('');
+            
+            // Load user's current images
+            loadUserImages(userId);
+            
+            $('#editUserModal').modal('show');
+        }).fail(function(xhr) {
+            alert('Error getting user details: ' + xhr.responseJSON.detail);
+        });
+    }
+
+    function loadUserImages(userId) {
+        $.get(`/api/users/${userId}/images`, function(images) {
+            currentUserImages = images;
+            displayUserImages(images);
+        }).fail(function(error) {
+            alert('Error loading user images');
+        });
+    }
+
+    function displayUserImages(images) {
+        const container = $('#currentFaceImages');
+        container.empty();
+        
+        images.forEach((imagePath, index) => {
+            container.append(`
+                <div class="col-6 mb-2">
+                    <div class="card">
+                        <img src="/api/database-files/${imagePath}" 
+                             class="card-img-top" 
+                             alt="Face Image"
+                             style="height: 150px; object-fit: cover;">
+                        <div class="card-body p-2">
+                            <button class="btn btn-danger btn-sm w-100" 
+                                    onclick="deleteUserImage('${imagePath}', ${index})">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `);
+        });
+    }
+
+    function updateUserImages(userId, images) {
+        const updateData = {
+            username: $('#editUserName').val(),
+            identifier: $('#editUserIdentifier').val(),
+            face_images: images
+        };
+        
+        $.ajax({
+            url: `/api/users/${userId}`,
+            type: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify(updateData),
+            error: function(xhr) {
+                alert('Error updating user images: ' + xhr.responseJSON?.detail);
+                // Reload images to ensure UI is in sync with server
+                loadUserImages(userId);
+            }
+        });
+    }
+    
+    // Handle new image preview
+    $('#editUserImage').change(function() {
+        const file = this.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                $('#editImagePreview').attr('src', e.target.result).removeClass('d-none');
+            }
+            reader.readAsDataURL(file);
+        }
+    });
+    
+    function deleteUserImage(imagePath, index) {
+        if (confirm('Are you sure you want to delete this image?')) {
+            const userId = $('#editUserId').val();
+            
+            // Remove image from display and array
+            currentUserImages = currentUserImages.filter(path => path !== imagePath);
+            displayUserImages(currentUserImages);
+            
+            // Update user with remaining images
+            updateUserImages(userId, currentUserImages);
+        }
+    }
+    
+    // Handle edit user form submission
+    $('#submitEditUser').click(function() {
+        const userId = $('#editUserId').val();
+        const userData = {
+            username: $('#editUserName').val(),
+            identifier: $('#editUserIdentifier').val()
+        };
+    
+        $.ajax({
+            url: `/api/users/${userId}`,
+            type: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify(userData),
+            success: function(response) {
+                $('#editUserModal').modal('hide');
+                loadUsers();  // Reload user list
+            },
+            error: function(xhr) {
+                alert('Error updating user: ' + xhr.responseJSON.detail);
+            }
+        });
+    });
 
     // Image preview
     $('#userImage').change(function() {
@@ -135,48 +309,79 @@ $(document).ready(function() {
     });
 });
 
+function viewUserImages(userId) {
+    $.get(`/api/users/${userId}/images`, function(images) {
+        const imageContainer = $('#_userImages');
+        imageContainer.empty();
+        console.log(images)
+        
+        if (images && images.length > 0) {
+            images.forEach(imagePath => {
+                const imageDiv = `
+                    <div class="col-md-4 mb-3">
+                        <div class="card">
+                            <img src="/api/database-files/${imagePath}" 
+                                class="card-img-top" 
+                                alt="User Image"
+                                style="object-fit: cover; height: 200px;"
+                                onerror="this.src='https://via.placeholder.com/200x200?text=Image+Not+Found'">
+                            <div class="card-body">
+                                <p class="card-text text-muted small">${imagePath}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                imageContainer.append(imageDiv);
+            });
+        } else {
+            imageContainer.html(`
+                <div class="col-12 text-center py-5">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>No face images found for this user.
+                    </div>
+                </div>
+            `);
+        }
+
+
+        $('#viewUserModal').modal('show');
+    }).fail(function(error) {
+        alert('Error loading user images');
+    });
+}
+
 function loadUsers() {
     $.get('/api/users/list', function(users) {
         const userList = $('#userList');
         userList.empty();
 
         users.forEach(user => {
-            const row = `
-                <tr>
-                    <td>${user.identifier}</td>
-                    <td>${user.username}</td>
-                    <td>
-                        <button class="btn btn-info btn-sm" onclick="viewUserImages('${user._id}')">
-                            View Images (${user.face_images_path?.length || 0})
-                        </button>
-                    </td>
-                    <td>${user.last_detection || 'Never'}</td>
-                    <td>
-                        <button class="btn btn-danger btn-sm" onclick="deleteUser('${user._id}')">Delete</button>
-                        <button class="btn btn-primary btn-sm" onclick="editUser('${user._id}')">Edit</button>
-                    </td>
-                </tr>
-            `;
-            userList.append(row);
+            // Skip unknown user
+            if (user.identifier !== 'unknown') {
+                const userId = user._id || user.id;  // Handle both _id and id
+                const row = `
+                    <tr>
+                        <td>${user.identifier}</td>
+                        <td>${user.username}</td>
+                        <td>
+                            <button class="btn btn-info btn-sm" onclick="viewUserImages('${userId}')">
+                                View Images (${user.face_images_path?.length || 0})
+                            </button>
+                        </td>
+                        <td>${user.last_detection || 'Never'}</td>
+                        <td>
+                            <button class="btn btn-danger btn-sm me-1" onclick="deleteUser('${userId}')">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                            <button class="btn btn-primary btn-sm" onclick="editUser('${userId}')">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                userList.append(row);
+            }
         });
-    });
-}
-
-function viewUserImages(userId) {
-    $.get(`/api/users/${userId}/images`, function(images) {
-        const imageContainer = $('#userImages');
-        imageContainer.empty();
-
-        images.forEach(imagePath => {
-            const image = `
-                <div class="col-md-4 mb-3">
-                    <img src="/static/${imagePath}" class="img-fluid" alt="User Image">
-                </div>
-            `;
-            imageContainer.append(image);
-        });
-
-        $('#viewUserModal').modal('show');
     });
 }
 
@@ -196,7 +401,166 @@ function deleteUser(userId) {
 }
 
 function editUser(userId) {
-    // Implement edit user functionality
+    // Get user details and populate form
+    $.get(`/api/users/${userId}`, function(user) {
+        $('#editUserId').val(userId);
+        $('#editUserName').val(user.username);
+        $('#editUserIdentifier').val(user.identifier);
+        // Reset image preview
+        $('#editImagePreview').addClass('d-none');
+        $('#editUserImage').val('');
+        $('#editUserModal').modal('show');
+    }).fail(function(xhr) {
+        alert('Error getting user details: ' + xhr.responseJSON.detail);
+    });
 }
+
+// Handle edit form submission
+$('#submitEditUser').click(function() {
+    const userId = $('#editUserId').val();
+    const formData = new FormData();
+    
+    formData.append('identifier', $('#editUserIdentifier').val());
+    formData.append('user_name', $('#editUserName').val());
+    
+    const imageFile = $('#editUserImage')[0].files[0];
+    if (imageFile) {
+        formData.append('file', imageFile);
+        
+        // Upload new image
+        $.ajax({
+            url: '/api/users/upload',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                $('#editUserModal').modal('hide');
+                loadUsers();
+            },
+            error: function(xhr) {
+                alert('Error updating user: ' + (xhr.responseJSON?.detail || 'Unknown error'));
+            }
+        });
+    } else {
+        // Just update user info if no new image
+        const userData = {
+            username: $('#editUserName').val(),
+            identifier: $('#editUserIdentifier').val()
+        };
+
+        $.ajax({
+            url: `/api/users/${userId}`,
+            type: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify(userData),
+            success: function(response) {
+                $('#editUserModal').modal('hide');
+                loadUsers();
+            },
+            error: function(xhr) {
+                alert('Error updating user: ' + (xhr.responseJSON?.detail || 'Unknown error'));
+            }
+        });
+    }
+});
+
+// Store selected files globally
+let selectedFiles = [];
+
+// Handle multiple image selection and preview
+$('#userImages').change(function() {
+    const files = Array.from(this.files);
+    selectedFiles = files; // Store files for later use
+    
+    const previewContainer = $('#imagePreviewContainer');
+    previewContainer.empty();
+    
+    files.forEach((file, index) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            previewContainer.append(`
+                <div class="col-6 mb-2">
+                    <div class="card">
+                        <img src="${e.target.result}" 
+                             class="card-img-top" 
+                             alt="Preview"
+                             style="height: 150px; object-fit: cover;">
+                        <div class="card-body p-2">
+                            <button type="button" 
+                                    class="btn btn-danger btn-sm w-100"
+                                    onclick="removePreview(${index})">
+                                <i class="fas fa-trash"></i> Remove
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `);
+        }
+        reader.readAsDataURL(file);
+    });
+});
+
+// Remove preview and file from selection
+function removePreview(index) {
+    selectedFiles = selectedFiles.filter((_, i) => i !== index);
+    
+    // Update input files
+    const dt = new DataTransfer();
+    selectedFiles.forEach(file => dt.items.add(file));
+    $('#userImages')[0].files = dt.files;
+    
+    // Trigger change event to refresh previews
+    $('#userImages').trigger('change');
+}
+
+// Reset form when modal is closed
+$('#addUserModal').on('hidden.bs.modal', function () {
+    $('#addUserForm')[0].reset();
+    $('#imagePreviewContainer').empty();
+    selectedFiles = [];
+});
+
+// Handle user form submission with multiple images
+$('#submitUser').click(async function() {
+    const userName = $('#userName').val();
+    const userIdentifier = $('#userIdentifier').val();
+    
+    if (!userName || !userIdentifier || selectedFiles.length === 0) {
+        alert('Please fill in all fields and select at least one image');
+        return;
+    }
+
+    try {
+        // Show loading state
+        $('#submitUser').prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Adding...');
+        
+        // Upload all images sequentially
+        for (let i = 0; i < selectedFiles.length; i++) {
+            const formData = new FormData();
+            formData.append('identifier', userIdentifier);
+            formData.append('user_name', userName);
+            formData.append('file', selectedFiles[i]);
+            
+            await $.ajax({
+                url: '/api/users/upload',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false
+            });
+        }
+        
+        // Success - close modal and refresh list
+        $('#addUserModal').modal('hide');
+        loadUsers();
+        
+    } catch (error) {
+        alert('Error adding user: ' + (error.responseJSON?.detail || 'Unknown error'));
+    } finally {
+        // Reset loading state
+        $('#submitUser').prop('disabled', false).text('Add User');
+    }
+});
 </script>
 {% endblock %}

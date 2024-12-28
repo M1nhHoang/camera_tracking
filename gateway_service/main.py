@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from routers import web_router, user_router, detect_router, camera_router
+from routers import web_router, user_router, detect_router, camera_router, static_router
 from config import settings
 
 app = FastAPI(
@@ -25,7 +25,7 @@ app.add_middleware(
 # Get the directory where this file is located
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Mount static files
+# Mount static files for serving CSS, JS, etc
 app.mount(
     "/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static"
 )
@@ -34,6 +34,7 @@ app.mount(
 app.include_router(user_router.router, prefix="/api/users", tags=["users"])
 app.include_router(detect_router.router, prefix="/api/detect", tags=["detect"])
 app.include_router(camera_router.router, prefix="/api/camera", tags=["camera"])
+app.include_router(static_router.router, tags=["static"])
 
 # Include web router for serving pages
 app.include_router(web_router.router)
@@ -41,23 +42,15 @@ app.include_router(web_router.router)
 
 @app.get("/health")
 async def health_check():
-    return {
-        "status": "healthy",
-        "services": {
-            "database": "online",
-            "face_identify": "online",
-            "face_embedding": "online",
-            "camera_inference": "online",
-        },
-    }
+    return {"status": "healthy"}
 
 
 if __name__ == "__main__":
     # Create necessary directories if they don't exist
-    os.makedirs(os.path.join(BASE_DIR, "static"), exist_ok=True)
-    os.makedirs(os.path.join(BASE_DIR, "static", "uploads"), exist_ok=True)
+    os.makedirs(os.path.join(BASE_DIR, "static", "css"), exist_ok=True)
+    os.makedirs(os.path.join(BASE_DIR, "static", "js"), exist_ok=True)
+    os.makedirs(os.path.join(BASE_DIR, "database_files"), exist_ok=True)
 
-    # Run the application
     uvicorn.run(
         "main:app", host=settings.GATEWAY_HOST, port=settings.GATEWAY_PORT, reload=True
     )

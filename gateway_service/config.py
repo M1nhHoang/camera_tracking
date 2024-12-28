@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     FACE_EMBEDDING_SERVICE_URL: str = "http://face_embedding_service:8001"
     CAMERA_INFERENCE_SERVICE_URL: str = "http://camera_inference_service:5000"
 
+    # Static files URL for database service
+    DATABASE_STATIC_URL: str = "http://database_service:8003/static"
+
     # JWT settings
     SECRET_KEY: str = "your-secret-key"  # Change in production
     ALGORITHM: str = "HS256"

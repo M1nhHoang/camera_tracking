@@ -1,18 +1,18 @@
-# router/users.py
-
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
+from pydantic import BaseModel
+from datetime import datetime
 from service.users import UserService
 
 router = APIRouter()
 
 
-# Pydantic models for request validation
-class UserCreate(BaseModel):
+class UserBase(BaseModel):
     username: str
     identifier: str
+
+
+class UserCreate(UserBase):
     face_images: Optional[List[str]] = None
 
 
@@ -22,70 +22,136 @@ class UserUpdate(BaseModel):
     face_images: Optional[List[str]] = None
 
 
-@router.post("/create")
-async def create_user(
-    user_data: UserCreate, user_service: UserService = Depends(UserService)
-):
+class UserResponse(UserBase):
+    id: str
+    face_images_path: Optional[List[str]] = (
+        []
+    )  # Make face_images_path optional with default empty list
+    created_at: str
+    updated_at: Optional[str] = None
+    last_detection: Optional[str] = None
+
+
+@router.post("/add", response_model=dict)
+async def create_user(user: UserCreate, service: UserService = Depends(UserService)):
     """Create a new user"""
     try:
-        user_id = user_service.create_user(
-            username=user_data.username,
-            identifier=user_data.identifier,
-            face_images=user_data.face_images,
+        user_id = service.create_user(
+            username=user.username,
+            identifier=user.identifier,
+            face_images=user.face_images,
         )
-        return JSONResponse(
-            status_code=201,
-            content={"message": "User created successfully", "user_id": user_id},
-        )
+        return {"user_id": user_id}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/{user_id}")
-async def get_user(user_id: str, user_service: UserService = Depends(UserService)):
-    """Get user by ID"""
-    try:
-        user = user_service.get_user(user_id)
-        return JSONResponse(status_code=200, content=user)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/")
-async def get_all_users(
-    skip: int = 0, limit: int = 100, user_service: UserService = Depends(UserService)
+@router.get("/list", response_model=List[UserResponse])
+async def list_users(
+    skip: int = 0, limit: int = 100, service: UserService = Depends(UserService)
 ):
-    """Get all users with pagination"""
+    """Get list of all users excluding unknown user"""
     try:
-        users = user_service.get_all_users(skip=skip, limit=limit)
-        return JSONResponse(
-            status_code=200,
-            content={"users": users, "total": len(users), "skip": skip, "limit": limit},
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Get all users
+        users = service.get_all_users(skip=skip, limit=limit)
+        # Filter out unknown user and format response
+        formatted_users = []
+        for user in users:
+            if user.get("identifier") != "unknown":
+                # Get the ID whether it's in _id or id field
+                user_id = str(user.get("_id", user.get("id", "")))
+                formatted_user = {
+                    "id": user_id,
+                    "_id": user_id,
+                    "username": user.get("username", ""),
+                    "identifier": user.get("identifier", ""),
+                    "face_images_path": user.get("face_images_path", []),
+                    "created_at": user.get("created_at", ""),
+                    "updated_at": user.get("updated_at"),
+                    "last_detection": user.get("last_detection"),
+                }
+                formatted_users.append(formatted_user)
+
+        return formatted_users
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{user_id}", response_model=UserResponse)
+async def get_user(user_id: str, service: UserService = Depends(UserService)):
+    """Get user details"""
+    try:
+        user = service.get_user(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        if user.get("identifier") == "unknown":
+            raise HTTPException(status_code=404, detail="Cannot access unknown user")
+
+        # Ensure face_images_path exists
+        if "face_images_path" not in user:
+            user["face_images_path"] = []
+
+        return user
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{user_id}/images", response_model=List[str])
+async def get_user_images(user_id: str, service: UserService = Depends(UserService)):
+    """Get user's face images"""
+    try:
+        # Check if user is unknown
+        user = service.get_user(user_id)
+        if user and user.get("identifier") == "unknown":
+            raise HTTPException(
+                status_code=404, detail="Cannot access unknown user images"
+            )
+
+        images = service.get_user_images(user_id)
+        return images
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.put("/{user_id}")
 async def update_user(
-    user_id: str,
-    user_data: UserUpdate,
-    user_service: UserService = Depends(UserService),
+    user_id: str, user: dict, service: UserService = Depends(UserService)
 ):
     """Update user information"""
     try:
-        # Convert Pydantic model to dict and remove None values
-        update_data = user_data.dict(exclude_unset=True)
-        success = user_service.update_user(user_id, update_data)
-        if success:
-            return JSONResponse(
-                status_code=200, content={"message": "User updated successfully"}
-            )
-        raise HTTPException(status_code=400, detail="Update failed")
+        # Check if user exists
+        existing_user = service.get_user(user_id)
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Check if user is unknown
+        if existing_user.get("identifier") == "unknown":
+            raise HTTPException(status_code=400, detail="Cannot update unknown user")
+
+        # Remove None values and empty strings
+        update_data = {k: v for k, v in user.items() if v is not None and v != ""}
+
+        # Validate required fields if they are being updated
+        if "identifier" in update_data and not update_data["identifier"]:
+            raise HTTPException(status_code=400, detail="Identifier cannot be empty")
+        if "username" in update_data and not update_data["username"]:
+            raise HTTPException(status_code=400, detail="Username cannot be empty")
+
+        # Check if new identifier already exists
+        if "identifier" in update_data and update_data[
+            "identifier"
+        ] != existing_user.get("identifier"):
+            if service.db_manager.find_one({"identifier": update_data["identifier"]}):
+                raise HTTPException(status_code=400, detail="Identifier already exists")
+
+        success = service.update_user(user_id, update_data)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to update user")
+
+        # Return updated user data
+        updated_user = service.get_user(user_id)
+        return updated_user
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -93,43 +159,86 @@ async def update_user(
 
 
 @router.delete("/{user_id}")
-async def delete_user(user_id: str, user_service: UserService = Depends(UserService)):
-    """Delete a user"""
+async def delete_user(user_id: str, service: UserService = Depends(UserService)):
+    """Delete user"""
     try:
-        success = user_service.delete_user(user_id)
-        if success:
-            return JSONResponse(
-                status_code=200, content={"message": "User deleted successfully"}
-            )
-        raise HTTPException(status_code=400, detail="Delete failed")
+        # Check if user is unknown
+        existing_user = service.get_user(user_id)
+        if existing_user and existing_user.get("identifier") == "unknown":
+            raise HTTPException(status_code=400, detail="Cannot delete unknown user")
+
+        success = service.delete_user(user_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="User not found")
+        return {"success": True}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
-# Existing endpoint
 @router.post("/user_update")
 async def user_update(
-    user_data: dict = {
-        "identifier": "",
-        "user_name": "",
-        "face_images": [],
-    },
-    user_service: UserService = Depends(UserService),
+    data: dict = {"identifier": "", "user_name": "", "face_images": []},
+    service: UserService = Depends(UserService),
 ):
-    # init
-    identifier = user_data["identifier"]
-    user_name = user_data["user_name"]
-    face_images = user_data["face_images"]
+    """Update or create user with face images"""
+    try:
+        # Check if trying to update unknown user
+        if data["identifier"] == "unknown":
+            raise HTTPException(status_code=400, detail="Cannot update unknown user")
 
-    # tracking
-    user_id, face_images = user_service.user_update(user_name, identifier, face_images)
+        # Convert face images to list if it's not already
+        face_images = data.get("face_images", [])
+        if not isinstance(face_images, list):
+            face_images = [face_images]
 
-    if user_id:
-        return JSONResponse(
-            status_code=200,
-            content={"user_id": user_id, "face_image_path": face_images[0]},
+        # First try to create a new user
+        try:
+            user_id = service.create_user(
+                username=data["user_name"],
+                identifier=data["identifier"],
+                face_images=face_images,
+            )
+
+            # Get face image path from newly created user
+            images = service.get_user_images(user_id)
+            face_image_path = images[0] if images else None
+
+            return {"user_id": user_id, "face_image_path": face_image_path}
+
+        except ValueError as e:
+            # If user exists, update instead
+            existing_user = service.db_manager.find_one(
+                {"identifier": data["identifier"]}
+            )
+            if not existing_user:
+                raise HTTPException(
+                    status_code=400, detail=f"User create/update failed: {str(e)}"
+                )
+
+            user_id = str(existing_user["_id"])
+            update_data = {
+                "username": data["user_name"],
+                "face_images": face_images,
+                "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }
+
+            # Update existing user
+            updated = service.update_user(user_id, update_data)
+            if not updated:
+                raise HTTPException(
+                    status_code=400, detail="Failed to update existing user"
+                )
+
+            # Get latest face image path
+            images = service.get_user_images(user_id)
+            face_image_path = images[0] if images else None
+
+            return {"user_id": user_id, "face_image_path": face_image_path}
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error in user_update: {str(e)}")
+        raise HTTPException(
+            status_code=400, detail=f"Failed to create or update user: {str(e)}"
         )
-
-    return JSONResponse(status_code=500, content={"message": "Update failed"})

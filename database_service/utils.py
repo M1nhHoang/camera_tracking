@@ -8,9 +8,7 @@ import random
 
 
 def genarate_id():
-    char_list = (
-        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()"
-    )
+    char_list = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
     detect_id = ""
     for _ in range(24):
         detect_id += random.choice(char_list)

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Form
 from typing import List, Optional
 from services.user_service import UserService
 from pydantic import BaseModel
@@ -40,17 +40,31 @@ async def get_user_images(user_id: str, service: UserService = Depends(UserServi
 
 @router.post("/upload")
 async def upload_user(
-    identifier: str,
-    user_name: str,
+    identifier: str = Form(...),
+    user_name: str = Form(...),
     file: UploadFile = File(...),
     service: UserService = Depends(UserService),
 ):
     """Upload new user with face image"""
     try:
-        user_id = await service.create_user(identifier, user_name, file)
-        return {"user_id": user_id}
-    except Exception as e:
+        if not file:
+            raise HTTPException(status_code=400, detail="No file provided")
+
+        if not file.content_type.startswith("image/"):
+            raise HTTPException(
+                status_code=400, detail="Invalid file type. Only images are allowed"
+            )
+
+        result = await service.create_user(identifier, user_name, file)
+        if not result:
+            raise HTTPException(status_code=500, detail="Failed to create user")
+
+        return result
+
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating user: {str(e)}")
 
 
 @router.delete("/{user_id}")

@@ -34,6 +34,7 @@ class BYTETrackerArgs:
 class CameraInferenceService:
     def __init__(
         self,
+        camera_id: str,
         stream_url: str,
         database_service: dict,
         face_identify_service: dict,
@@ -46,6 +47,7 @@ class CameraInferenceService:
         queue_size: int = 30,
     ):
         # Camera info
+        self.camera_id = camera_id
         self.stream_url = stream_url
         self.camera_name = camera_name
         self.location = location
@@ -75,6 +77,7 @@ class CameraInferenceService:
     def create_from_config(cls, config: dict, services: dict, model_path: str):
         """Create instance from config dictionary"""
         return cls(
+            camera_id=config["camera_id"],
             stream_url=config["stream_url"],
             database_service=services["database_service"],
             face_identify_service=services["face_identify_service"],
@@ -167,7 +170,7 @@ class CameraInferenceService:
                     # Send to face identification service
                     response = requests.post(
                         f"http://{self.face_identify_hostname}:{self.face_identify_port}/face_identification",
-                        params={"detect_id": track_id},
+                        params={"detect_id": track_id, "camera_id": self.camera_id},
                         files={
                             "origin_image": (
                                 "origin_image.jpg",
@@ -233,6 +236,9 @@ class CameraInferenceService:
                 font_scale = 1.0
                 thickness = 3
                 for x1, y1, x2, y2, label in draw_reg_list:
+                    # Ensure label is string
+                    label = str(label) if label is not None else "Unknown"
+
                     # Draw thicker bounding box with greater thickness
                     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 3)
 

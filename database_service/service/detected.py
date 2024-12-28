@@ -27,6 +27,7 @@ class DetectedService:
         truth_image_path,
         distance,
         force_update,
+        camera_id=None,
         user_id=None,
     ):
         # current time
@@ -49,7 +50,7 @@ class DetectedService:
         # Check if record with detect id exists
         existing_record = self.db_manager.find_one({"detect_id": tracking_id})
         if existing_record:
-            unknow_user_id = UserService().get_unkow_user_id()
+            unknow_user_id = UserService().get_unknown_user_id()
 
             # check is detect user
             if existing_record["user_id"] == unknow_user_id:
@@ -80,6 +81,7 @@ class DetectedService:
                     {"detect_id": tracking_id},
                     {
                         "user_id": ObjectId(user_id) if user_id else unknow_user_id,
+                        "camera_id": ObjectId(camera_id) if camera_id else None,
                         "guess_uesr_id": ObjectId(
                             unknow_user_id
                         ),  # update later, save as similar user face
@@ -96,10 +98,11 @@ class DetectedService:
                     "user_id": (
                         ObjectId(user_id)
                         if user_id
-                        else UserService().get_unkow_user_id()
+                        else UserService().get_unknown_user_id()
                     ),
+                    "camera_id": ObjectId(camera_id) if camera_id else None,
                     "guess_uesr_id": ObjectId(
-                        UserService().get_unkow_user_id()
+                        UserService().get_unknown_user_id()
                     ),  # update later, save as similar user face
                     "face_image_path": save_image_to_folder(
                         face_image, self.static_files
@@ -126,7 +129,7 @@ class DetectedService:
             return "Peding detect...", True
 
         user_id = detected.get("user_id")
-        user_name = UserService().get_user_name_by_id(user_id)
+        user_name = UserService().get_user(user_id)["username"]
 
         return user_name, user_name == "unknown"
 
@@ -360,6 +363,54 @@ class DetectedService:
                 )
 
         return sorted(stats, key=lambda x: x["count"], reverse=True)
+
+    async def get_detection(self, detection_id: str):
+        """Get detection details by ID"""
+        try:
+            # Convert string ID to ObjectId
+            detection_id = ObjectId(detection_id)
+
+            # Get detection record
+            record = self.db_manager.find_one({"_id": detection_id})
+            if not record:
+                return None
+
+            # Get user info
+            user_db = MongoDBManager(collection_name="users")
+            user = user_db.find_one({"_id": record["user_id"]})
+            username = user["username"] if user else "Unknown"
+
+            # Get camera info if exists
+            camera_name = "Unknown"
+            if "camera_id" in record:
+                camera_db = MongoDBManager(collection_name="cameras")
+                camera = camera_db.find_one({"_id": record["camera_id"]})
+                if camera:
+                    camera_name = (
+                        f"{camera['name']} ({camera['location']})"
+                        if "location" in camera
+                        else camera["name"]
+                    )
+
+            # Format response
+            detection = {
+                "id": str(record["_id"]),
+                "user_id": str(record["user_id"]),
+                "user_name": username,
+                "camera_name": camera_name,
+                "time_stamp": record["time_stamp"],
+                "distance": record["distance"],
+                "origin_image_path": record.get("origin_image_path"),
+                "face_image_path": record.get("face_image_path"),
+                "detect_image_path": record.get("detect_image_path"),
+                "truth_image_path": record.get("truth_image_path"),
+            }
+
+            return detection
+
+        except Exception as e:
+            print(f"Error getting detection: {str(e)}")
+            return None
 
     def _get_user_name(self, user_id: ObjectId) -> str:
         """Get user name from user ID"""
