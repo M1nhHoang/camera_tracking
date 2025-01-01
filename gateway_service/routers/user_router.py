@@ -42,20 +42,23 @@ async def get_user_images(user_id: str, service: UserService = Depends(UserServi
 async def upload_user(
     identifier: str = Form(...),
     user_name: str = Form(...),
-    file: UploadFile = File(...),
+    files: List[UploadFile] = File(...),
     service: UserService = Depends(UserService),
 ):
-    """Upload new user with face image"""
+    """Upload new user with multiple face images"""
     try:
-        if not file:
-            raise HTTPException(status_code=400, detail="No file provided")
+        if not files:
+            raise HTTPException(status_code=400, detail="No files provided")
 
-        if not file.content_type.startswith("image/"):
-            raise HTTPException(
-                status_code=400, detail="Invalid file type. Only images are allowed"
-            )
+        # Validate file types
+        for file in files:
+            if not file.content_type.startswith("image/"):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid file type for {file.filename}. Only images are allowed",
+                )
 
-        result = await service.create_user(identifier, user_name, file)
+        result = await service.create_user(identifier, user_name, files)
         if not result:
             raise HTTPException(status_code=500, detail="Failed to create user")
 
@@ -88,3 +91,53 @@ async def update_user(
     if not success:
         raise HTTPException(status_code=404, detail="User not found")
     return {"success": True}
+
+
+@router.delete("/{user_id}/images/{image_path}")
+async def delete_user_image(
+    user_id: str, image_path: str, service: UserService = Depends(UserService)
+):
+    """Delete specific image from user"""
+    try:
+        # Delete from database service
+        db_response = await service.delete_user_image(user_id, image_path)
+        if not db_response:
+            raise HTTPException(status_code=404, detail="Image not found")
+
+        # Delete from face identify service
+        identify_response = await service.delete_user_image_embedding(
+            user_id, image_path
+        )
+        if not identify_response:
+            # Log warning but don't fail if embedding deletion fails
+            print(f"Warning: Failed to delete embedding for image {image_path}")
+
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{user_id}/images/upload")
+async def upload_user_images(
+    user_id: str,
+    files: List[UploadFile] = File(...),
+    service: UserService = Depends(UserService),
+):
+    """Upload new images for existing user"""
+    try:
+        # Upload to database service first
+        db_response = await service.upload_user_images(user_id, files)
+
+        # Process face embeddings for new images
+        identify_response = await service.process_user_images(
+            user_id, db_response["added_images"]
+        )
+
+        return {
+            "success": True,
+            "processed_images": len(db_response["added_images"]),
+            "failed_images": 0,
+        }
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

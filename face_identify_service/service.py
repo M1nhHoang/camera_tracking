@@ -125,6 +125,63 @@ class FaceIdentifyService:
             print(f"Error deleting face embedding: {str(e)}")
             return False
 
+    def get_user_embeddings(self, user_id: str) -> list:
+        """Get all face embeddings for a specific user"""
+        try:
+            results = self.chroma_collection.get(
+                where={"user_id": user_id}, include=["metadatas", "embeddings"]
+            )
+            return results
+        except Exception as e:
+            print(f"Error getting user embeddings: {str(e)}")
+            return None
+
+    def delete_user_embeddings(self, user_id: str) -> bool:
+        """Delete all face embeddings for a specific user"""
+        try:
+            # Get all embeddings for user
+            results = self.chroma_collection.get(where={"user_id": user_id})
+
+            if results and results["ids"]:
+                # Delete embeddings by their IDs
+                self.chroma_collection.delete(ids=results["ids"])
+                return True
+            return False
+        except Exception as e:
+            print(f"Error deleting user embeddings: {str(e)}")
+            return False
+
+    def update_user_metadata(self, user_id: str, new_metadata: dict) -> bool:
+        """Update metadata for all embeddings of a user"""
+        try:
+            # Get all embeddings for user
+            results = self.chroma_collection.get(where={"user_id": user_id})
+
+            if not results or not results["ids"]:
+                return False
+
+            # Update each embedding's metadata
+            for idx, id in enumerate(results["ids"]):
+                current_metadata = results["metadatas"][idx]
+                # Merge current metadata with new metadata
+                updated_metadata = {**current_metadata, **new_metadata}
+                # Update the embedding
+                self.chroma_collection.update(ids=[id], metadatas=[updated_metadata])
+
+            return True
+        except Exception as e:
+            print(f"Error updating user metadata: {str(e)}")
+            return False
+
+    def count_user_embeddings(self, user_id: str) -> int:
+        """Count number of embeddings for a user"""
+        try:
+            results = self.chroma_collection.get(where={"user_id": user_id})
+            return len(results["ids"]) if results else 0
+        except Exception as e:
+            print(f"Error counting user embeddings: {str(e)}")
+            return 0
+
     def search_similar_faces(self, query_embedding: list, n_results: int = 5) -> list:
         """Search for similar face embeddings"""
         try:
@@ -202,9 +259,9 @@ class FaceIdentifyService:
 
     def face_validate(self, detect_image):
         face_images = self.face_detect(detect_image, is_counter=True)
-        # if len(face_images) != 1:
-        #     logging.error("Must be only one face in your image.")
-        #     raise ValueError("Must be only one face in your image.")
+        if len(face_images) != 1:
+            logging.error("Must be only one face in your image.")
+            raise ValueError("Must be only one face in your image.")
 
         face_image = face_images[0]
         if self.is_image_quality(face_image, 500) is False:
@@ -252,7 +309,6 @@ class FaceIdentifyService:
 
     def process_face_image_upload(self, user_info: dict, btye_image):
         image = Image.open(BytesIO(btye_image))
-        image = image.convert("RGB")
         image = np.array(image)
 
         face_image = self.face_validate(image)

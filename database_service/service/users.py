@@ -1,3 +1,6 @@
+import os
+import uuid
+
 from database import MongoDBManager
 from utils import base64_to_image, save_image_to_folder
 from bson.objectid import ObjectId
@@ -101,31 +104,27 @@ class UserService:
             if "username" in update_data:
                 update_document["username"] = update_data["username"]
             if "identifier" in update_data:
-                # Check if new identifier already exists
-                if update_data["identifier"] != existing_user["identifier"]:
-                    existing = self.db_manager.find_one(
-                        {"identifier": update_data["identifier"]}
-                    )
-                    if existing:
-                        raise ValueError("Identifier already exists")
                 update_document["identifier"] = update_data["identifier"]
 
             # Process face images if provided
             if "face_images" in update_data:
                 face_images = update_data["face_images"]
-                face_image_paths = []
-                for image in face_images:
-                    try:
-                        image_data = base64_to_image(image)
-                        image_path = save_image_to_folder(image_data, self.static_files)
-                        face_image_paths.append(image_path)
-                    except Exception as e:
-                        print(f"Error processing image: {str(e)}")
-                        continue
+                new_image_paths = []
 
-                # Append new paths to existing ones
+                # Process and save new images
+                for image in face_images:
+                    image_data = base64_to_image(image)
+                    image_path = save_image_to_folder(image_data, self.static_files)
+                    new_image_paths.append(image_path)
+
+                # Get existing image paths
                 existing_paths = existing_user.get("face_images_path", [])
-                update_document["face_images_path"] = existing_paths + face_image_paths
+
+                # Combine existing and new paths
+                all_paths = existing_paths + new_image_paths
+
+                # Update the document with combined paths
+                update_document["face_images_path"] = all_paths
 
             # Add updated timestamp
             update_document["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -157,50 +156,6 @@ class UserService:
             return formatted_users
         except Exception as e:
             raise ValueError(f"Error getting users: {str(e)}")
-
-    def update_user(self, user_id: str, update_data: Dict) -> bool:
-        """Update user information"""
-        try:
-            user_id_obj = ObjectId(user_id)
-
-            # Verify user exists
-            existing_user = self.db_manager.find_one({"_id": user_id_obj})
-            if not existing_user:
-                raise ValueError(f"User with ID {user_id} not found")
-
-            # Create update document
-            update_document = {}
-
-            # Handle basic fields
-            if "username" in update_data:
-                update_document["username"] = update_data["username"]
-            if "identifier" in update_data:
-                update_document["identifier"] = update_data["identifier"]
-
-            # Process face images if provided
-            if "face_images" in update_data:
-                face_images = update_data["face_images"]
-                face_image_paths = []
-                for image in face_images:
-                    image_data = base64_to_image(image)
-                    image_path = save_image_to_folder(image_data, self.static_files)
-                    face_image_paths.append(image_path)
-                update_document["face_images_path"] = face_image_paths
-
-            # Add updated timestamp
-            update_document["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            # Perform update
-            result = self.db_manager.update_one({"_id": user_id_obj}, update_document)
-
-            if result.modified_count > 0:
-                # Return updated user data
-                updated_user = self.db_manager.find_one({"_id": user_id_obj})
-                return self._format_user(updated_user)
-            return None
-
-        except Exception as e:
-            raise ValueError(f"Error updating user: {str(e)}")
 
     def delete_user(self, user_id: str) -> bool:
         """Delete a user"""
@@ -258,3 +213,75 @@ class UserService:
             return result.modified_count > 0
         except Exception as e:
             raise ValueError(f"Error updating last detection: {str(e)}")
+
+    async def delete_user_image(self, user_id: str, image_path: str) -> bool:
+        """Delete specific image from user's face images"""
+        # try:
+        user_id_obj = ObjectId(user_id)
+        user = self.db_manager.find_one({"_id": user_id_obj})
+        if not user:
+            raise ValueError(f"User with ID {user_id} not found")
+
+        # Check if image exists in user's images
+        current_images = user.get("face_images_path", [])
+        if image_path not in current_images:
+            return False
+        print(current_images)
+
+        # Remove image from list
+        updated_images = [img for img in current_images if img != image_path]
+
+        # Update user document
+        result = self.db_manager.update_one(
+            {"_id": user_id_obj}, {"face_images_path": updated_images}
+        )
+
+        if result.modified_count > 0:
+            # Delete actual image file
+            full_path = os.path.join(self.static_files, image_path)
+            if os.path.exists(full_path):
+                os.remove(full_path)
+            return True
+
+        return False
+
+        # except Exception as e:
+        #     raise ValueError(f"Error deleting user image: {str(e)}")
+
+    async def add_user_images(self, user_id: str, new_image_paths: List[str]) -> bool:
+        """Add new images to user's face images list"""
+        try:
+            user_id_obj = ObjectId(user_id)
+            user = self.db_manager.find_one({"_id": user_id_obj})
+            if not user:
+                return False
+
+            # Get current images and append new ones
+            current_images = user.get("face_images_path", [])
+            updated_images = current_images + new_image_paths
+
+            # Update user document
+            result = self.db_manager.update_one(
+                {"_id": user_id_obj}, {"face_images_path": updated_images}
+            )
+
+            return result.modified_count > 0
+
+        except Exception as e:
+            raise ValueError(f"Error adding user images: {str(e)}")
+
+    def save_user_image(self, image_content: bytes) -> str:
+        """Save image file and return its path"""
+        try:
+            # Generate unique filename
+            filename = f"{uuid.uuid4()}.jpg"
+
+            # Save image file
+            image_path = os.path.join(self.static_files, filename)
+            with open(image_path, "wb") as f:
+                f.write(image_content)
+
+            return filename
+
+        except Exception as e:
+            raise ValueError(f"Error saving image: {str(e)}")

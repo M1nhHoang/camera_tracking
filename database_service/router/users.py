@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime
@@ -201,7 +201,7 @@ async def user_update(
 
             # Get face image path from newly created user
             images = service.get_user_images(user_id)
-            face_image_path = images[0] if images else None
+            face_image_path = images[len(images) - 1] if images else None
 
             return {"user_id": user_id, "face_image_path": face_image_path}
 
@@ -231,7 +231,7 @@ async def user_update(
 
             # Get latest face image path
             images = service.get_user_images(user_id)
-            face_image_path = images[0] if images else None
+            face_image_path = images[len(images) - 1] if images else None
 
             return {"user_id": user_id, "face_image_path": face_image_path}
 
@@ -242,3 +242,48 @@ async def user_update(
         raise HTTPException(
             status_code=400, detail=f"Failed to create or update user: {str(e)}"
         )
+
+
+@router.delete("/{user_id}/images/{image_path}")
+async def delete_user_image(
+    user_id: str, image_path: str, service: UserService = Depends(UserService)
+):
+    """Delete a specific image from user's face images"""
+    try:
+        success = await service.delete_user_image(user_id, image_path)
+        if not success:
+            raise HTTPException(status_code=404, detail="Image not found")
+        return {"success": True}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{user_id}/images/upload")
+async def upload_user_images(
+    user_id: str,
+    files: List[UploadFile] = File(...),
+    service: UserService = Depends(UserService),
+):
+    """Add new images to existing user"""
+    try:
+        # Process and save new images
+        new_image_paths = []
+        for file in files:
+            if not file.content_type.startswith("image/"):
+                raise HTTPException(
+                    status_code=400, detail=f"File {file.filename} is not an image"
+                )
+
+            content = await file.read()
+            new_path = service.save_user_image(content)
+            new_image_paths.append(new_path)
+
+        # Update user's image list
+        success = await service.add_user_images(user_id, new_image_paths)
+        if not success:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return {"success": True, "added_images": new_image_paths}
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

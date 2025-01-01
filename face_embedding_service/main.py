@@ -16,7 +16,6 @@ app = FastAPI()
 @app.post("/embed")
 async def get_embedding(file: UploadFile = File(...)):
     image = Image.open(BytesIO(await file.read()))
-    image = image.convert("RGB")
     image = np.array(image)
 
     # Perform embedding

@@ -1,7 +1,7 @@
 import uvicorn
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.responses import JSONResponse
-from typing import Optional, List
+from typing import Optional, List, Dict
 from pydantic import BaseModel
 import numpy as np
 from PIL import Image
@@ -54,25 +54,66 @@ async def face_identification(
 
 @app.post("/face_upload")
 async def face_upload(
-    file: UploadFile = File(...),
+    files: List[UploadFile] = File(...),
     identifier: str = Form(...),
     user_name: str = Form(...),
 ):
-    """Upload face image with user info via form-data"""
-    try:
-        # Đọc nội dung file
-        file_content = await file.read()
+    """Upload multiple face images with user info via form-data"""
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided")
 
-        # Process face image upload
-        face_identify_service.process_face_image_upload(
-            {"identifier": identifier, "user_name": user_name}, file_content
-        )
+    results = {
+        "success": False,
+        "processed_images": 0,
+        "failed_images": 0,
+        "failed_reasons": [],
+        "details": [],
+    }
 
-        return {"success": True}
+    for file in files:
+        try:
+            # Đọc nội dung file
+            file_content = await file.read()
 
-    except Exception as e:
-        print(f"Error in face_upload: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+            # Process face image upload
+            face_identify_service.process_face_image_upload(
+                {"identifier": identifier, "user_name": user_name}, file_content
+            )
+
+            # Track successful processing
+            results["processed_images"] += 1
+            results["details"].append(
+                {"filename": file.filename, "status": "success", "error": None}
+            )
+
+        except ValueError as ve:
+            # Handle validation errors (e.g., no face, multiple faces, quality issues)
+            results["failed_images"] += 1
+            results["failed_reasons"].append(str(ve))
+            results["details"].append(
+                {"filename": file.filename, "status": "failed", "error": str(ve)}
+            )
+
+        except Exception as e:
+            # Handle other unexpected errors
+            results["failed_images"] += 1
+            results["failed_reasons"].append(str(e))
+            results["details"].append(
+                {"filename": file.filename, "status": "failed", "error": str(e)}
+            )
+
+    # Set overall success if at least one image was processed successfully
+    if results["processed_images"] > 0:
+        results["success"] = True
+        return results
+    else:
+        # If no images were processed successfully, raise an error with details
+        error_detail = {
+            "message": "No images were processed successfully",
+            "total_failed": results["failed_images"],
+            "reasons": results["failed_reasons"],
+        }
+        raise HTTPException(status_code=400, detail=error_detail)
 
 
 # New embedding management endpoints
@@ -139,6 +180,210 @@ async def search_embeddings(query_embedding: List[float], n_results: Optional[in
     """Search for similar face embeddings"""
     results = face_identify_service.search_similar_faces(query_embedding, n_results)
     return JSONResponse(content=results)
+
+
+@app.get("/users/{user_id}")
+async def get_user(user_id: str):
+    """Get user details and embeddings"""
+    try:
+        # Query ChromaDB for user's embeddings
+        results = face_identify_service.chroma_collection.get(
+            where={"user_id": user_id},
+            include=["metadatas"],  # Only include metadata, not embeddings
+        )
+
+        if not results or not results["metadatas"]:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Get the first metadata entry for user info
+        user_metadata = results["metadatas"][0]
+
+        # Return formatted user data
+        return {
+            "user_id": user_id,
+            "username": user_metadata.get("user_name"),
+            "identifier": user_metadata.get("identifier"),
+            "embedding_count": len(results["metadatas"]),
+            "images": [
+                metadata.get("truth_image_path")
+                for metadata in results["metadatas"]
+                if metadata.get("truth_image_path")
+            ],
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/users/{user_id}")
+async def delete_user(user_id: str):
+    """Delete all face embeddings for a specific user"""
+    try:
+        success = face_identify_service.delete_user_embeddings(user_id)
+        if not success:
+            raise HTTPException(
+                status_code=404,
+                detail=f"User {user_id} not found or no embeddings to delete",
+            )
+        return {"message": f"All embeddings for user {user_id} deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/users/{user_id}")
+async def update_user(user_id: str, metadata: Dict):
+    """Update metadata for all embeddings of a user"""
+    try:
+        success = face_identify_service.update_user_metadata(user_id, metadata)
+        if not success:
+            raise HTTPException(
+                status_code=404,
+                detail=f"User {user_id} not found or no embeddings to update",
+            )
+        return {"message": f"Metadata for user {user_id} updated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/users/{user_id}/count")
+async def count_user_embeddings(user_id: str):
+    """Get count of embeddings for a user"""
+    try:
+        count = face_identify_service.count_user_embeddings(user_id)
+        return {"user_id": user_id, "embeddings_count": count}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/users")
+async def list_users(skip: int = 0, limit: int = 100):
+    """List all users with embeddings"""
+    try:
+        results = face_identify_service.chroma_collection.get()
+        if not results or not results["metadatas"]:
+            return {"users": [], "total": 0}
+
+        # Extract unique users from metadata
+        users = {}
+        for metadata in results["metadatas"]:
+            if metadata.get("user_id") and metadata.get("user_name"):
+                users[metadata["user_id"]] = {
+                    "user_id": metadata["user_id"],
+                    "user_name": metadata["user_name"],
+                    "identifier": metadata.get("identifier"),
+                }
+
+        # Convert to list and apply pagination
+        users_list = list(users.values())
+        total = len(users_list)
+        paginated_users = users_list[skip : skip + limit]
+
+        return {"users": paginated_users, "total": total, "skip": skip, "limit": limit}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/users/{user_id}/images/{image_path}")
+async def delete_user_image(user_id: str, image_path: str):
+    """Delete face embedding for specific image"""
+    # try:
+    # Get embedding that matches user_id and image_path
+    results = face_identify_service.chroma_collection.get(
+        where={
+            "$and": [
+                {"user_id": {"$eq": user_id}},
+                {"truth_image_path": {"$eq": image_path}},
+            ]
+        }
+    )
+
+    print(results)
+    print(user_id, image_path)
+
+    if results and results["ids"]:
+        # Delete matching embedding(s)
+        face_identify_service.chroma_collection.delete(ids=results["ids"])
+        return {"success": True}
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No embedding found for user {user_id} and image {image_path}",
+        )
+
+    # except Exception as e:
+    #     raise HTTPException(
+    #         status_code=500, detail=f"Error deleting embedding: {str(e)}"
+    #     )
+
+
+@app.post("/users/{user_id}/images/upload")
+async def add_user_images(
+    user_id: str,
+    identifier: str = Form(...),
+    user_name: str = Form(...),
+    files: List[UploadFile] = File(...),
+):
+    """Upload and process new images for existing user"""
+    results = {
+        "success": False,
+        "processed_images": 0,
+        "failed_images": 0,
+        "failed_reasons": [],
+        "details": [],
+    }
+
+    for file in files:
+        try:
+            # Read and validate image
+            file_content = await file.read()
+            image = Image.open(BytesIO(file_content))
+            image = np.array(image)
+
+            # Validate face in image
+            face_image = face_identify_service.face_validate(image)
+
+            # Convert face image to base64 for storage
+            face_image_base64 = face_identify_service.convert_image_to_base64(
+                face_image
+            )
+
+            # Get face embedding
+            face_embedding = face_identify_service.embedding(face_image)
+            if face_embedding is None:
+                raise ValueError(f"Failed to generate embedding for {file.filename}")
+
+            # Insert into ChromaDB
+            metadata = {
+                "user_id": user_id,
+                "user_name": user_name,
+                "identifier": identifier,
+                "image_name": file.filename,
+                "image_path": face_image_base64,
+            }
+            face_identify_service.chromadb_insert(metadata, face_embedding)
+
+            results["processed_images"] += 1
+            results["details"].append(
+                {"filename": file.filename, "status": "success", "error": None}
+            )
+
+        except ValueError as ve:
+            results["failed_images"] += 1
+            results["failed_reasons"].append(str(ve))
+            results["details"].append(
+                {"filename": file.filename, "status": "failed", "error": str(ve)}
+            )
+
+        except Exception as e:
+            results["failed_images"] += 1
+            results["failed_reasons"].append(str(e))
+            results["details"].append(
+                {"filename": file.filename, "status": "failed", "error": str(e)}
+            )
+
+    # Set overall success if at least one image was processed
+    results["success"] = results["processed_images"] > 0
+    return results
 
 
 if __name__ == "__main__":

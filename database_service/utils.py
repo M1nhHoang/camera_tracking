@@ -43,11 +43,11 @@ def base64_to_image(image_data):
     elif isinstance(image_data, str):
         image_bytes = base64.b64decode(image_data)
         image_np = np.array(Image.open(io.BytesIO(image_bytes)))
-        return cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
+        return image_np
     elif isinstance(image_data, bytes):
         # If image is image_bytes
         image_np = np.array(Image.open(io.BytesIO(image_data)))
-        return cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
+        return image_np
     else:
         raise ValueError("Unsupported image format")
 
