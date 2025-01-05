@@ -81,16 +81,40 @@ async def delete_user(user_id: str, service: UserService = Depends(UserService))
 
 @router.put("/{user_id}")
 async def update_user(
-    user_id: str,
-    user_name: str,
-    identifier: str,
-    service: UserService = Depends(UserService),
+    user_id: str, user: dict, service: UserService = Depends(UserService)
 ):
     """Update user information"""
-    success = await service.update_user(user_id, user_name, identifier)
-    if not success:
-        raise HTTPException(status_code=404, detail="User not found")
-    return {"success": True}
+    try:
+        # Check if user exists
+        existing_user = await service.get_user(user_id)
+        if not existing_user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Check if user is unknown
+        if existing_user.get("identifier") == "unknown":
+            raise HTTPException(status_code=400, detail="Cannot update unknown user")
+
+        # Remove None values and empty strings
+        update_data = {k: v for k, v in user.items() if v is not None and v != ""}
+
+        # Validate required fields if they are being updated
+        if "identifier" in update_data and not update_data["identifier"]:
+            raise HTTPException(status_code=400, detail="Identifier cannot be empty")
+        if "username" in update_data and not update_data["username"]:
+            raise HTTPException(status_code=400, detail="Username cannot be empty")
+
+        success = await service.update_user(user_id, update_data)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to update user")
+
+        # Return updated user data
+        updated_user = await service.get_user(user_id)
+        return updated_user
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete("/{user_id}/images/{image_path}")

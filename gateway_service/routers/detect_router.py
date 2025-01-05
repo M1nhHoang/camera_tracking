@@ -15,7 +15,7 @@ async def list_detections(
     user_id: Optional[str] = None,
     camera_id: Optional[str] = None,
     sort_by: Optional[str] = "time_stamp",
-    sort_order: Optional[str] = "desc",
+    sort_order: Optional[str] = "asc",
     service: DetectionService = Depends(DetectionService),
 ):
     """Get filtered list of detections with pagination"""
@@ -45,7 +45,7 @@ async def list_detections(
                 detail=f"Invalid sort_by field. Must be one of: {', '.join(valid_sort_fields)}",
             )
 
-        valid_sort_orders = ["asc", "desc"]
+        valid_sort_orders = ["desc", "desc"]
         if sort_order and sort_order not in valid_sort_orders:
             raise HTTPException(
                 status_code=400,
@@ -137,5 +137,21 @@ async def get_camera_stats(service: DetectionService = Depends(DetectionService)
     try:
         stats = await service.get_camera_stats()
         return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/{detection_id}/update_user")
+async def update_detection_user(
+    detection_id: str,
+    update_data: dict,
+    service: DetectionService = Depends(DetectionService),
+):
+    """Update user info in detection log"""
+    try:
+        success = await service.update_detection_user(detection_id, update_data)
+        if not success:
+            raise HTTPException(status_code=404, detail="Detection not found")
+        return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

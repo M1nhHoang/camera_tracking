@@ -57,7 +57,8 @@
                             </div>
                             <div class="mb-3">
                                 <label for="userImages" class="form-label">Face Images</label>
-                                <input type="file" class="form-control" id="userImages" accept="image/*" multiple required>
+                                <input type="file" class="form-control" id="userImages" accept="image/*" multiple
+                                    required>
                                 <div class="form-text text-muted">You can select multiple images</div>
                             </div>
                             <div class="progress mt-2 d-none" id="uploadProgress">
@@ -106,14 +107,14 @@
         position: relative;
         margin-bottom: 1rem;
     }
-    
+
     .preview-item img {
         width: 100%;
         height: 150px;
         object-fit: cover;
         border-radius: 4px;
     }
-    
+
     .preview-remove {
         position: absolute;
         top: 0.5rem;
@@ -124,21 +125,21 @@
         cursor: pointer;
         transition: all 0.2s;
     }
-    
+
     .preview-remove:hover {
         background: rgba(255, 255, 255, 1);
         transform: scale(1.1);
     }
-    
+
     .upload-progress {
         height: 2px;
         margin-top: 0.5rem;
     }
-    
+
     .is-invalid {
         border-color: #dc3545;
     }
-    
+
     .invalid-feedback {
         display: block;
         color: #dc3545;
@@ -179,7 +180,8 @@
                             </div>
                             <button type="button" class="btn btn-primary" id="uploadEditImages">
                                 <i class="fas fa-upload"></i>
-                                <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                <span class="spinner-border spinner-border-sm d-none" role="status"
+                                    aria-hidden="true"></span>
                                 Upload Images
                             </button>
                         </div>
@@ -203,25 +205,25 @@
 
 {% block scripts %}
 <script>
-$(document).ready(function() {
-    loadUsers();
+    $(document).ready(function () {
+        loadUsers();
 
-    function loadUserImages(userId) {
-        $.get(`/api/users/${userId}/images`, function(images) {
-            currentUserImages = images;
-            displayUserImages(images);
-        }).fail(function(error) {
-            alert('Error loading user images');
-        });
-    }
+        function loadUserImages(userId) {
+            $.get(`/api/users/${userId}/images`, function (images) {
+                currentUserImages = images;
+                displayUserImages(images);
+            }).fail(function (error) {
+                alert('Error loading user images');
+            });
+        }
 
 
-    function displayUserImages(images) {
-        const container = $('#currentFaceImages');
-        container.empty();
-        
-        images.forEach((imagePath, index) => {
-            container.append(`
+        function displayUserImages(images) {
+            const container = $('#currentFaceImages');
+            container.empty();
+
+            images.forEach((imagePath, index) => {
+                container.append(`
                 <div class="col-6 mb-2">
                     <div class="card">
                         <img src="/api/database-files/${imagePath}" 
@@ -237,48 +239,48 @@ $(document).ready(function() {
                     </div>
                 </div>
             `);
-        });
-    }
+            });
+        }
 
-    function updateUserImages(userId, images) {
-        const updateData = {
-            username: $('#editUserName').val(),
-            identifier: $('#editUserIdentifier').val(),
-            face_images: images
-        };
-        
-        $.ajax({
-            url: `/api/users/${userId}`,
-            type: 'PUT',
-            contentType: 'application/json',
-            data: JSON.stringify(updateData),
-            error: function(xhr) {
-                alert('Error updating user images: ' + xhr.responseJSON?.detail);
-                // Reload images to ensure UI is in sync with server
-                loadUserImages(userId);
-            }
-        });
-    }
-    
-    // Handle new image preview
-    $('#editUserImage').change(function(e) {
-        const files = e.target.files;
-        const previewContainer = $('#editImagePreview');
-        
-        // Clear previous previews
-        previewContainer.empty();
-        
-        if (files.length > 0) {
-            // Create previews for each selected file
-            Array.from(files).forEach(file => {
-                if (!file.type.startsWith('image/')) {
-                    alert(`File ${file.name} is not an image`);
-                    return;
+        function updateUserImages(userId, images) {
+            const updateData = {
+                username: $('#editUserName').val(),
+                identifier: $('#editUserIdentifier').val(),
+                face_images: images
+            };
+
+            $.ajax({
+                url: `/api/users/${userId}`,
+                type: 'PUT',
+                contentType: 'application/json',
+                data: JSON.stringify(updateData),
+                error: function (xhr) {
+                    alert('Error updating user images: ' + xhr.responseJSON?.detail);
+                    // Reload images to ensure UI is in sync with server
+                    loadUserImages(userId);
                 }
-                
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    previewContainer.removeClass('d-none').append(`
+            });
+        }
+
+        // Handle new image preview
+        $('#editUserImage').change(function (e) {
+            const files = e.target.files;
+            const previewContainer = $('#editImagePreview');
+
+            // Clear previous previews
+            previewContainer.empty();
+
+            if (files.length > 0) {
+                // Create previews for each selected file
+                Array.from(files).forEach(file => {
+                    if (!file.type.startsWith('image/')) {
+                        alert(`File ${file.name} is not an image`);
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        previewContainer.removeClass('d-none').append(`
                         <div class="mb-2">
                             <img src="${e.target.result}" 
                                  class="img-thumbnail" 
@@ -286,187 +288,165 @@ $(document).ready(function() {
                                  alt="Preview">
                         </div>
                     `);
-                };
-                reader.readAsDataURL(file);
-            });
-        } else {
-            previewContainer.addClass('d-none');
-        }
-    });
+                    };
+                    reader.readAsDataURL(file);
+                });
+            } else {
+                previewContainer.addClass('d-none');
+            }
+        });
 
-    // Handle image upload in edit modal
-    async function handleEditImageUpload(userId) {
-        const fileInput = $('#editUserImage')[0];
-        if (fileInput.files.length === 0) {
-            return;
+        // Handle image upload in edit modal
+        async function handleEditImageUpload(userId) {
+            const fileInput = $('#editUserImage')[0];
+            if (fileInput.files.length === 0) {
+                return;
+            }
+
+            try {
+                // Show loading state
+                $('#uploadEditImages').prop('disabled', true)
+                    .find('.spinner-border').removeClass('d-none');
+
+                const formData = new FormData();
+                const userName = $('#editUserName').val();
+                const identifier = $('#editUserIdentifier').val();
+
+                // Thêm thông tin user vào form
+                formData.append('identifier', identifier);
+                formData.append('user_name', userName);
+
+                // Thêm các files được chọn
+                Array.from(fileInput.files).forEach(file => {
+                    formData.append('files', file);
+                });
+
+                const response = await $.ajax({
+                    url: '/api/users/upload',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    xhr: function () {
+                        const xhr = new window.XMLHttpRequest();
+                        xhr.upload.addEventListener('progress', function (e) {
+                            if (e.lengthComputable) {
+                                const percent = Math.round((e.loaded / e.total) * 100);
+                                $('#uploadProgress')
+                                    .removeClass('d-none')
+                                    .find('.progress-bar')
+                                    .css('width', percent + '%')
+                                    .attr('aria-valuenow', percent);
+                            }
+                        });
+                        return xhr;
+                    }
+                });
+
+                if (response.success) {
+                    // Show detailed results
+                    let message = `Successfully processed ${response.processed_images} image(s).`;
+                    if (response.failed_images > 0) {
+                        message += `\n${response.failed_images} image(s) failed face processing.`;
+                    }
+
+                    // Show alert with details
+                    showDetailedAlert('success', message, response.details);
+
+                    // Clear form and reload images
+                    $('#editUserImage').val('');
+                    $('#editImagePreview').empty().addClass('d-none');
+                    loadCurrentImages(userId);
+                }
+
+            } catch (error) {
+                showAlert('danger', 'Error uploading images: ' +
+                    (error.responseJSON?.detail || 'Unknown error'));
+            } finally {
+                // Reset UI state
+                $('#uploadEditImages').prop('disabled', false)
+                    .find('.spinner-border').addClass('d-none');
+                $('#uploadProgress').addClass('d-none')
+                    .find('.progress-bar')
+                    .css('width', '0%')
+                    .attr('aria-valuenow', 0);
+            }
         }
-    
-        try {
-            // Show loading state
-            $('#uploadEditImages').prop('disabled', true)
-                .find('.spinner-border').removeClass('d-none');
-            
+
+        // Add upload button click handler
+        $('#uploadEditImages').click(function () {
+            const userId = $('#editUserId').val();
+            handleEditImageUpload(userId);
+        });
+
+        function deleteUserImage(imagePath, index) {
+            if (confirm('Are you sure you want to delete this image?')) {
+                const userId = $('#editUserId').val();
+
+                // Remove image from display and array
+                currentUserImages = currentUserImages.filter(path => path !== imagePath);
+                displayUserImages(currentUserImages);
+
+                // Update user with remaining images
+                updateUserImages(userId, currentUserImages);
+            }
+        }
+
+
+        // Image preview
+        $('#userImage').change(function () {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    $('#imagePreview').attr('src', e.target.result).removeClass('d-none');
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Handle user form submission
+        $('#submitUser').click(function () {
             const formData = new FormData();
-            const userName = $('#editUserName').val();
-            const identifier = $('#editUserIdentifier').val();
-    
-            // Thêm thông tin user vào form
-            formData.append('identifier', identifier);
-            formData.append('user_name', userName);
-            
-            // Thêm các files được chọn
-            Array.from(fileInput.files).forEach(file => {
-                formData.append('files', file);
-            });
-    
-            const response = await $.ajax({
+            formData.append('identifier', $('#userIdentifier').val());
+            formData.append('user_name', $('#userName').val());
+            formData.append('file', $('#userImage')[0].files[0]);
+
+            $.ajax({
                 url: '/api/users/upload',
                 type: 'POST',
                 data: formData,
                 processData: false,
                 contentType: false,
-                xhr: function() {
-                    const xhr = new window.XMLHttpRequest();
-                    xhr.upload.addEventListener('progress', function(e) {
-                        if (e.lengthComputable) {
-                            const percent = Math.round((e.loaded / e.total) * 100);
-                            $('#uploadProgress')
-                                .removeClass('d-none')
-                                .find('.progress-bar')
-                                .css('width', percent + '%')
-                                .attr('aria-valuenow', percent);
-                        }
-                    });
-                    return xhr;
+                success: function (response) {
+                    $('#addUserModal').modal('hide');
+                    loadUsers();
+                    $('#addUserForm')[0].reset();
+                    $('#imagePreview').addClass('d-none');
+                },
+                error: function (error) {
+                    alert('Error adding user');
                 }
             });
-    
-            if (response.success) {
-                // Show detailed results
-                let message = `Successfully processed ${response.processed_images} image(s).`;
-                if (response.failed_images > 0) {
-                    message += `\n${response.failed_images} image(s) failed face processing.`;
-                }
-    
-                // Show alert with details
-                showDetailedAlert('success', message, response.details);
-    
-                // Clear form and reload images
-                $('#editUserImage').val('');
-                $('#editImagePreview').empty().addClass('d-none');
-                loadCurrentImages(userId);
-            }
-    
-        } catch (error) {
-            showAlert('danger', 'Error uploading images: ' + 
-                (error.responseJSON?.detail || 'Unknown error'));
-        } finally {
-            // Reset UI state
-            $('#uploadEditImages').prop('disabled', false)
-                .find('.spinner-border').addClass('d-none');
-            $('#uploadProgress').addClass('d-none')
-                .find('.progress-bar')
-                .css('width', '0%')
-                .attr('aria-valuenow', 0);
-        }
-    }
-
-    // Add upload button click handler
-    $('#uploadEditImages').click(function() {
-        const userId = $('#editUserId').val();
-        handleEditImageUpload(userId);
-    });
-        
-    function deleteUserImage(imagePath, index) {
-        if (confirm('Are you sure you want to delete this image?')) {
-            const userId = $('#editUserId').val();
-            
-            // Remove image from display and array
-            currentUserImages = currentUserImages.filter(path => path !== imagePath);
-            displayUserImages(currentUserImages);
-            
-            // Update user with remaining images
-            updateUserImages(userId, currentUserImages);
-        }
-    }
-    
-    // Handle edit user form submission
-    $('#submitEditUser').click(function() {
-        const userId = $('#editUserId').val();
-        const userData = {
-            username: $('#editUserName').val(),
-            identifier: $('#editUserIdentifier').val()
-        };
-    
-        $.ajax({
-            url: `/api/users/${userId}`,
-            type: 'PUT',
-            contentType: 'application/json',
-            data: JSON.stringify(userData),
-            success: function(response) {
-                $('#editUserModal').modal('hide');
-                loadUsers();  // Reload user list
-            },
-            error: function(xhr) {
-                alert('Error updating user: ' + xhr.responseJSON.detail);
-            }
         });
     });
 
-    // Image preview
-    $('#userImage').change(function() {
-        const file = this.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                $('#imagePreview').attr('src', e.target.result).removeClass('d-none');
-            }
-            reader.readAsDataURL(file);
-        }
-    });
+    function generateIdentifier() {
+        // Generate a random string with prefix 'USER_' followed by timestamp and random chars
+        const timestamp = new Date().getTime().toString(36);
+        const randomChars = Math.random().toString(36).substring(2, 8);
+        return `USER_${timestamp}_${randomChars}`.toUpperCase();
+    }
 
-    // Handle user form submission
-    $('#submitUser').click(function() {
-        const formData = new FormData();
-        formData.append('identifier', $('#userIdentifier').val());
-        formData.append('user_name', $('#userName').val());
-        formData.append('file', $('#userImage')[0].files[0]);
+    function viewUserImages(userId) {
+        $.get(`/api/users/${userId}/images`, function (images) {
+            const imageContainer = $('#_userImages');
+            imageContainer.empty();
+            console.log(images)
 
-        $.ajax({
-            url: '/api/users/upload',
-            type: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(response) {
-                $('#addUserModal').modal('hide');
-                loadUsers();
-                $('#addUserForm')[0].reset();
-                $('#imagePreview').addClass('d-none');
-            },
-            error: function(error) {
-                alert('Error adding user');
-            }
-        });
-    });
-});
-
-function generateIdentifier() {
-    // Generate a random string with prefix 'USER_' followed by timestamp and random chars
-    const timestamp = new Date().getTime().toString(36);
-    const randomChars = Math.random().toString(36).substring(2, 8);
-    return `USER_${timestamp}_${randomChars}`.toUpperCase();
-}
-
-function viewUserImages(userId) {
-    $.get(`/api/users/${userId}/images`, function(images) {
-        const imageContainer = $('#_userImages');
-        imageContainer.empty();
-        console.log(images)
-        
-        if (images && images.length > 0) {
-            images.forEach(imagePath => {
-                const imageDiv = `
+            if (images && images.length > 0) {
+                images.forEach(imagePath => {
+                    const imageDiv = `
                     <div class="col-md-4 mb-3">
                         <div class="card">
                             <img src="/api/database-files/${imagePath}" 
@@ -480,35 +460,35 @@ function viewUserImages(userId) {
                         </div>
                     </div>
                 `;
-                imageContainer.append(imageDiv);
-            });
-        } else {
-            imageContainer.html(`
+                    imageContainer.append(imageDiv);
+                });
+            } else {
+                imageContainer.html(`
                 <div class="col-12 text-center py-5">
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>No face images found for this user.
                     </div>
                 </div>
             `);
-        }
+            }
 
 
-        $('#viewUserModal').modal('show');
-    }).fail(function(error) {
-        alert('Error loading user images');
-    });
-}
+            $('#viewUserModal').modal('show');
+        }).fail(function (error) {
+            alert('Error loading user images');
+        });
+    }
 
-function loadUsers() {
-    $.get('/api/users/list', function(users) {
-        const userList = $('#userList');
-        userList.empty();
+    function loadUsers() {
+        $.get('/api/users/list', function (users) {
+            const userList = $('#userList');
+            userList.empty();
 
-        users.forEach(user => {
-            // Skip unknown user
-            if (user.identifier !== 'unknown') {
-                const userId = user._id || user.id;  // Handle both _id and id
-                const row = `
+            users.forEach(user => {
+                // Skip unknown user
+                if (user.identifier !== 'unknown') {
+                    const userId = user._id || user.id;  // Handle both _id and id
+                    const row = `
                     <tr>
                         <td>${user.identifier}</td>
                         <td>${user.username}</td>
@@ -528,93 +508,93 @@ function loadUsers() {
                         </td>
                     </tr>
                 `;
-                userList.append(row);
-            }
+                    userList.append(row);
+                }
+            });
         });
-    });
-}
+    }
 
-function deleteUser(userId) {
-    if (confirm('Are you sure you want to delete this user?')) {
+    function deleteUser(userId) {
+        if (confirm('Are you sure you want to delete this user?')) {
+            $.ajax({
+                url: `/api/users/${userId}`,
+                type: 'DELETE',
+                success: function () {
+                    loadUsers();
+                },
+                error: function () {
+                    alert('Error deleting user');
+                }
+            });
+        }
+    }
+
+    function editUser(userId) {
+        // Get user details and populate form
+        $.get(`/api/users/${userId}`, function (user) {
+            $('#editUserId').val(userId);
+            $('#editUserName').val(user.username);
+            $('#editUserIdentifier').val(user.identifier);
+
+            // Reset image preview and file input
+            $('#editImagePreview').addClass('d-none');
+            $('#editUserImage').val('');
+
+            // Load and display current face images
+            loadCurrentImages(userId);
+
+            $('#editUserModal').modal('show');
+        }).fail(function (xhr) {
+            alert('Error getting user details: ' + xhr.responseJSON.detail);
+        });
+    }
+
+    function handleEditImageDelete(imagePath, index) {
+        event.preventDefault();
+        if (!confirm('Are you sure you want to delete this image?')) {
+            return;
+        }
+
+        const userId = $('#editUserId').val();
+
+        // Call new delete API
         $.ajax({
-            url: `/api/users/${userId}`,
+            url: `/api/users/${userId}/images/${imagePath}`,
             type: 'DELETE',
-            success: function() {
-                loadUsers();
-            },
-            error: function() {
-                alert('Error deleting user');
-            }
-        });
-    }
-}
+            success: function () {
+                // Remove image card from UI
+                $(`button[data-image="${imagePath}"]`).closest('.col-6').remove();
 
-function editUser(userId) {
-    // Get user details and populate form
-    $.get(`/api/users/${userId}`, function(user) {
-        $('#editUserId').val(userId);
-        $('#editUserName').val(user.username);
-        $('#editUserIdentifier').val(user.identifier);
-        
-        // Reset image preview and file input
-        $('#editImagePreview').addClass('d-none');
-        $('#editUserImage').val('');
-
-        // Load and display current face images
-        loadCurrentImages(userId);
-        
-        $('#editUserModal').modal('show');
-    }).fail(function(xhr) {
-        alert('Error getting user details: ' + xhr.responseJSON.detail);
-    });
-}
-
-function handleEditImageDelete(imagePath, index) {
-    event.preventDefault();
-    if (!confirm('Are you sure you want to delete this image?')) {
-        return;
-    }
-
-    const userId = $('#editUserId').val();
-    
-    // Call new delete API
-    $.ajax({
-        url: `/api/users/${userId}/images/${imagePath}`,
-        type: 'DELETE',
-        success: function() {
-            // Remove image card from UI
-            $(`button[data-image="${imagePath}"]`).closest('.col-6').remove();
-            
-            // Check if any images remain
-            if ($('#currentFaceImages .col-6').length === 0) {
-                $('#currentFaceImages').html(`
+                // Check if any images remain
+                if ($('#currentFaceImages .col-6').length === 0) {
+                    $('#currentFaceImages').html(`
                     <div class="col-12">
                         <div class="alert alert-info">
                             No face images found. Please upload at least one face image.
                         </div>
                     </div>
                 `);
+                }
+
+                // Reload all images to ensure UI is in sync
+                loadCurrentImages(userId);
+            },
+            error: function (xhr) {
+                alert('Error deleting image: ' + (xhr.responseJSON?.detail || 'Unknown error'));
+                // Reload all images to ensure UI is in sync
+                loadCurrentImages(userId);
             }
+        });
+    }
 
-            // Reload all images to ensure UI is in sync
-            loadCurrentImages(userId);
-        },
-        error: function(xhr) {
-            alert('Error deleting image: ' + (xhr.responseJSON?.detail || 'Unknown error'));
-            // Reload all images to ensure UI is in sync
-            loadCurrentImages(userId);
-        }
-    });
-}
+    function loadCurrentImages(userId) {
+        $.get(`/api/users/${userId}/images`, function (imagePaths) {
+            const container = $('#currentFaceImages');
+            container.empty();
 
-function loadCurrentImages(userId) {
-    $.get(`/api/users/${userId}/images`, function(imagePaths) {
-        const container = $('#currentFaceImages');
-        container.empty();
-        
-        if (imagePaths && imagePaths.length > 0) {
-            imagePaths.forEach((imagePath, index) => {
-                container.append(`
+            if (imagePaths && imagePaths.length > 0) {
+                imagePaths.forEach((imagePath, index) => {
+                    container.append(`
                     <div class="col-6 mb-2">
                         <div class="card">
                             <img src="/api/database-files/${imagePath}" 
@@ -630,57 +610,30 @@ function loadCurrentImages(userId) {
                         </div>
                     </div>
                 `);
-            });
-        } else {
-            container.html(`
+                });
+            } else {
+                container.html(`
                 <div class="col-12">
                     <div class="alert alert-info">
                         No face images found. Please upload at least one face image.
                     </div>
                 </div>
             `);
-        }
-    }).fail(function(error) {
-        const container = $('#currentFaceImages');
-        container.html(`
+            }
+        }).fail(function (error) {
+            const container = $('#currentFaceImages');
+            container.html(`
             <div class="col-12">
                 <div class="alert alert-danger">
                     Error loading face images. Please try again later.
                 </div>
             </div>
         `);
-    });
-}
-
-// Handle edit form submission
-$('#submitEditUser').click(function() {
-    const userId = $('#editUserId').val();
-    const formData = new FormData();
-    
-    formData.append('identifier', $('#editUserIdentifier').val());
-    formData.append('user_name', $('#editUserName').val());
-    
-    const imageFile = $('#editUserImage')[0].files[0];
-    if (imageFile) {
-        formData.append('file', imageFile);
-        
-        // Upload new image
-        $.ajax({
-            url: '/api/users/upload',
-            type: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(response) {
-                $('#editUserModal').modal('hide');
-                loadUsers();
-            },
-            error: function(xhr) {
-                alert('Error updating user: ' + (xhr.responseJSON?.detail || 'Unknown error'));
-            }
         });
-    } else {
-        // Just update user info if no new image
+    }
+
+    $('#submitEditUser').click(function () {
+        const userId = $('#editUserId').val();
         const userData = {
             username: $('#editUserName').val(),
             identifier: $('#editUserIdentifier').val()
@@ -691,38 +644,37 @@ $('#submitEditUser').click(function() {
             type: 'PUT',
             contentType: 'application/json',
             data: JSON.stringify(userData),
-            success: function(response) {
+            success: function (response) {
                 $('#editUserModal').modal('hide');
-                loadUsers();
+                loadUsers();  // Reload user list
             },
-            error: function(xhr) {
-                alert('Error updating user: ' + (xhr.responseJSON?.detail || 'Unknown error'));
+            error: function (xhr) {
+                alert('Error updating user: ' + xhr.responseJSON?.detail || 'Unknown error');
             }
         });
-    }
-});
+    });
 
-// Store selected files globally
-let selectedFiles = [];
+    // Store selected files globally
+    let selectedFiles = [];
 
-// Handle multiple image selection and preview
-$('#userImages').change(function() {
-    const files = Array.from(this.files);
-    selectedFiles = [...selectedFiles, ...files]; // Append new files to existing ones
-    
-    const previewContainer = $('#imagePreviewContainer');
-    
-    // Create previews for new files
-    files.forEach((file, index) => {
-        if (!file.type.startsWith('image/')) {
-            alert(`File ${file.name} is not an image`);
-            return;
-        }
+    // Handle multiple image selection and preview
+    $('#userImages').change(function () {
+        const files = Array.from(this.files);
+        selectedFiles = [...selectedFiles, ...files]; // Append new files to existing ones
 
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const previewId = `preview-${Date.now()}-${index}`;
-            const previewHtml = `
+        const previewContainer = $('#imagePreviewContainer');
+
+        // Create previews for new files
+        files.forEach((file, index) => {
+            if (!file.type.startsWith('image/')) {
+                alert(`File ${file.name} is not an image`);
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const previewId = `preview-${Date.now()}-${index}`;
+                const previewHtml = `
                 <div class="col-6 mb-2">
                     <div class="card preview-item" id="${previewId}">
                         <img src="${e.target.result}" class="card-img-top" alt="Preview">
@@ -736,155 +688,155 @@ $('#userImages').change(function() {
                     </div>
                 </div>
             `;
-            previewContainer.append(previewHtml);
-        };
-        reader.readAsDataURL(file);
+                previewContainer.append(previewHtml);
+            };
+            reader.readAsDataURL(file);
+        });
+
+        updateSubmitButtonState();
     });
 
-    updateSubmitButtonState();
-});
-
-// Remove preview and file from selection
-function removePreview(previewId, fileIndex) {
-    $(`#${previewId}`).remove();
-    selectedFiles = selectedFiles.filter((_, index) => index !== fileIndex);
-    updateSubmitButtonState();
-}
-
-// Update submit button state based on form validity
-function updateSubmitButtonState() {
-    const userName = $('#userName').val();
-    const isValid = userName && selectedFiles.length > 0;
-    $('#submitUser').prop('disabled', !isValid);
-}
-
-// Handle form input changes
-$('#userName, #userIdentifier').on('input', updateSubmitButtonState);
-
-// Reset form when modal is closed
-$('#addUserModal').on('hidden.bs.modal', function () {
-    $('#addUserForm')[0].reset();
-    $('#imagePreviewContainer').empty();
-    selectedFiles = [];
-    updateSubmitButtonState();
-    hideUploadProgress();
-});
-
-// Show upload progress
-function showUploadProgress() {
-    $('#uploadProgress').removeClass('d-none');
-    $('#submitUser .spinner-border').removeClass('d-none');
-    $('#submitUser').prop('disabled', true);
-}
-
-// Hide upload progress
-function hideUploadProgress() {
-    $('#uploadProgress').addClass('d-none');
-    $('#submitUser .spinner-border').addClass('d-none');
-    $('#submitUser').prop('disabled', false);
-}
-
-// Handle user form submission with multiple images
-$('#submitUser').click(async function() {
-    const userName = $('#userName').val();
-    const userIdentifier = generateIdentifier();
-    
-    if (!userName || selectedFiles.length === 0) {
-        showAlert('warning', 'Please fill in user name and select at least one image');
-        return;
+    // Remove preview and file from selection
+    function removePreview(previewId, fileIndex) {
+        $(`#${previewId}`).remove();
+        selectedFiles = selectedFiles.filter((_, index) => index !== fileIndex);
+        updateSubmitButtonState();
     }
 
-    try {
-        showUploadProgress();
-        
-        // Create form data with all files
-        const formData = new FormData();
-        formData.append('identifier', userIdentifier);
-        formData.append('user_name', userName);
-        selectedFiles.forEach(file => {
-            formData.append('files', file);
-        });
-        
-        // Upload files
-        const response = await $.ajax({
-            url: '/api/users/upload',
-            type: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            xhr: function() {
-                const xhr = new window.XMLHttpRequest();
-                xhr.upload.addEventListener('progress', function(e) {
-                    if (e.lengthComputable) {
-                        const percent = Math.round((e.loaded / e.total) * 100);
-                        updateProgress(percent);
-                    }
-                });
-                return xhr;
-            }
-        });
+    // Update submit button state based on form validity
+    function updateSubmitButtonState() {
+        const userName = $('#userName').val();
+        const isValid = userName && selectedFiles.length > 0;
+        $('#submitUser').prop('disabled', !isValid);
+    }
 
-        // Show result summary
-        if (response.success) {
-            let message = `Successfully processed ${response.processed_images} image(s).`;
-            if (response.failed_images > 0) {
-                message += `\n${response.failed_images} image(s) failed to process.`;
-            }
-            
-            // Create detailed report
-            let detailsHtml = '<ul class="list-unstyled">';
-            response.details.forEach(detail => {
-                const icon = detail.status === 'success' ? 
-                    '<i class="fas fa-check-circle text-success"></i>' : 
-                    '<i class="fas fa-exclamation-circle text-danger"></i>';
-                    
-                detailsHtml += `
+    // Handle form input changes
+    $('#userName, #userIdentifier').on('input', updateSubmitButtonState);
+
+    // Reset form when modal is closed
+    $('#addUserModal').on('hidden.bs.modal', function () {
+        $('#addUserForm')[0].reset();
+        $('#imagePreviewContainer').empty();
+        selectedFiles = [];
+        updateSubmitButtonState();
+        hideUploadProgress();
+    });
+
+    // Show upload progress
+    function showUploadProgress() {
+        $('#uploadProgress').removeClass('d-none');
+        $('#submitUser .spinner-border').removeClass('d-none');
+        $('#submitUser').prop('disabled', true);
+    }
+
+    // Hide upload progress
+    function hideUploadProgress() {
+        $('#uploadProgress').addClass('d-none');
+        $('#submitUser .spinner-border').addClass('d-none');
+        $('#submitUser').prop('disabled', false);
+    }
+
+    // Handle user form submission with multiple images
+    $('#submitUser').click(async function () {
+        const userName = $('#userName').val();
+        const userIdentifier = generateIdentifier();
+
+        if (!userName || selectedFiles.length === 0) {
+            showAlert('warning', 'Please fill in user name and select at least one image');
+            return;
+        }
+
+        try {
+            showUploadProgress();
+
+            // Create form data with all files
+            const formData = new FormData();
+            formData.append('identifier', userIdentifier);
+            formData.append('user_name', userName);
+            selectedFiles.forEach(file => {
+                formData.append('files', file);
+            });
+
+            // Upload files
+            const response = await $.ajax({
+                url: '/api/users/upload',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                xhr: function () {
+                    const xhr = new window.XMLHttpRequest();
+                    xhr.upload.addEventListener('progress', function (e) {
+                        if (e.lengthComputable) {
+                            const percent = Math.round((e.loaded / e.total) * 100);
+                            updateProgress(percent);
+                        }
+                    });
+                    return xhr;
+                }
+            });
+
+            // Show result summary
+            if (response.success) {
+                let message = `Successfully processed ${response.processed_images} image(s).`;
+                if (response.failed_images > 0) {
+                    message += `\n${response.failed_images} image(s) failed to process.`;
+                }
+
+                // Create detailed report
+                let detailsHtml = '<ul class="list-unstyled">';
+                response.details.forEach(detail => {
+                    const icon = detail.status === 'success' ?
+                        '<i class="fas fa-check-circle text-success"></i>' :
+                        '<i class="fas fa-exclamation-circle text-danger"></i>';
+
+                    detailsHtml += `
                     <li class="mb-2">
                         ${icon} ${detail.filename}: 
                         <span class="${detail.status === 'success' ? 'text-success' : 'text-danger'}">
                             ${detail.status === 'success' ? 'Success' : detail.error}
                         </span>
                     </li>`;
-            });
-            detailsHtml += '</ul>';
-            
-            // Show alert with collapsible details
-            showDetailedAlert('success', message, detailsHtml);
-            
-            // Close modal and refresh user list if at least one image was successful
-            $('#addUserModal').modal('hide');
-            loadUsers();
-        }
-        
-    } catch (error) {
-        console.error('Upload error:', error);
-        let errorMessage = 'Error uploading images: ';
-        
-        if (error.responseJSON?.detail) {
-            if (typeof error.responseJSON.detail === 'object') {
-                // Handle detailed error response
-                errorMessage += error.responseJSON.detail.message;
-                const failedDetails = error.responseJSON.detail.reasons.map(reason => 
-                    `<li>${reason}</li>`
-                ).join('');
-                errorMessage += `<ul class="mt-2">${failedDetails}</ul>`;
-            } else {
-                errorMessage += error.responseJSON.detail;
-            }
-        } else {
-            errorMessage += 'Unknown error occurred';
-        }
-        
-        showAlert('danger', errorMessage);
-    } finally {
-        hideUploadProgress();
-    }
-});
+                });
+                detailsHtml += '</ul>';
 
-// Show alert with collapsible details
-function showDetailedAlert(type, message, detailsHtml) {
-    const alertId = 'alert-' + Date.now();
-    const alertHtml = `
+                // Show alert with collapsible details
+                showDetailedAlert('success', message, detailsHtml);
+
+                // Close modal and refresh user list if at least one image was successful
+                $('#addUserModal').modal('hide');
+                loadUsers();
+            }
+
+        } catch (error) {
+            console.error('Upload error:', error);
+            let errorMessage = 'Error uploading images: ';
+
+            if (error.responseJSON?.detail) {
+                if (typeof error.responseJSON.detail === 'object') {
+                    // Handle detailed error response
+                    errorMessage += error.responseJSON.detail.message;
+                    const failedDetails = error.responseJSON.detail.reasons.map(reason =>
+                        `<li>${reason}</li>`
+                    ).join('');
+                    errorMessage += `<ul class="mt-2">${failedDetails}</ul>`;
+                } else {
+                    errorMessage += error.responseJSON.detail;
+                }
+            } else {
+                errorMessage += 'Unknown error occurred';
+            }
+
+            showAlert('danger', errorMessage);
+        } finally {
+            hideUploadProgress();
+        }
+    });
+
+    // Show alert with collapsible details
+    function showDetailedAlert(type, message, detailsHtml) {
+        const alertId = 'alert-' + Date.now();
+        const alertHtml = `
         <div class="alert alert-${type} alert-dismissible fade show" role="alert">
             <div class="d-flex justify-content-between align-items-start">
                 <div>
@@ -904,30 +856,30 @@ function showDetailedAlert(type, message, detailsHtml) {
             </div>
         </div>
     `;
-    $('#addUserModal').first().prepend(alertHtml);
-    
-    // Auto-hide alert after 10 seconds, but only if it's a success message
-    if (type === 'success') {
-        setTimeout(() => {
-            $(`#${alertId}`).alert('close');
-        }, 10000);
-    }
-}
+        $('#addUserModal').first().prepend(alertHtml);
 
-// Show alert message
-function showAlert(type, message) {
-    const alertHtml = `
+        // Auto-hide alert after 10 seconds, but only if it's a success message
+        if (type === 'success') {
+            setTimeout(() => {
+                $(`#${alertId}`).alert('close');
+            }, 10000);
+        }
+    }
+
+    // Show alert message
+    function showAlert(type, message) {
+        const alertHtml = `
         <div class="alert alert-${type} alert-dismissible fade show" role="alert">
             ${message}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     `;
-    $('#addUserModal').first().prepend(alertHtml);
-    
-    // Auto-hide alert after 5 seconds
-    setTimeout(() => {
-        $('.alert').alert('close');
-    }, 5000);
-}
+        $('#addUserModal').first().prepend(alertHtml);
+
+        // Auto-hide alert after 5 seconds
+        setTimeout(() => {
+            $('.alert').alert('close');
+        }, 5000);
+    }
 </script>
 {% endblock %}

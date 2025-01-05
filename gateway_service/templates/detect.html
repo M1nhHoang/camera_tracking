@@ -45,7 +45,7 @@
                     <div class="col-md-2">
                         <label for="sortOrder" class="form-label">Order</label>
                         <select class="form-control" id="sortOrder">
-                            <option value="desc">Descending</option>
+                            <option value="desc" selected>Descending</option>
                             <option value="asc">Ascending</option>
                         </select>
                     </div>
@@ -97,6 +97,50 @@
         </div>
     </div>
 </div>
+
+<!-- Add to User Modal -->
+<div class="modal fade" id="addToUserModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Detection to User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Preview area -->
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <h6>Detected Face</h6>
+                        <img id="detectedFacePreview" class="img-fluid mb-3" alt="Detected Face">
+                    </div>
+                    <div class="col-md-6">
+                        <!-- User selection -->
+                        <div class="mb-3">
+                            <label for="selectUser" class="form-label">Select User</label>
+                            <select class="form-control" id="selectUser" required>
+                                <option value="">Choose a user...</option>
+                            </select>
+                        </div>
+                        <!-- User images preview -->
+                        <div id="userPreview" class="d-none">
+                            <h6>Current User Images</h6>
+                            <div id="userImages" class="row g-2">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmAddToUser">
+                    <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                    Add to User
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <!-- View Detection Modal -->
 <div class="modal fade" id="viewDetectionModal" tabindex="-1">
@@ -190,104 +234,114 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-let currentPage = 1;
-const perPage = 10;
+    let currentPage = 1;
+    const perPage = 10;
 
-$(document).ready(function() {
-    // Set default dates (last 7 days)
-    const today = new Date();
-    const lastWeek = new Date(today);
-    lastWeek.setDate(lastWeek.getDate() - 7);
-    
-    $('#dateFrom').val(lastWeek.toISOString().split('T')[0]);
-    $('#dateTo').val(today.toISOString().split('T')[0]);
+    $(document).ready(function () {
+        const today = new Date();
+        const todayUTC7 = new Date(today.getTime() + (7 * 60 * 60 * 1000));
+        todayUTC7.setHours(0, 0, 0, 0);
 
-    // Load initial data
-    loadUsers();
-    loadDetections();
-    loadStatistics();
+        const lastWeekUTC7 = new Date(todayUTC7);
+        lastWeekUTC7.setDate(lastWeekUTC7.getDate() - 1);
 
-    // Event handlers
-    $('#filterBtn').click(function() {
-        currentPage = 1;
+        const tomorrowUTC7 = new Date(todayUTC7);
+        tomorrowUTC7.setDate(tomorrowUTC7.getDate() + 2);
+
+        $('#dateFrom').val(lastWeekUTC7.toISOString().split('T')[0]);
+        $('#dateTo').val(tomorrowUTC7.toISOString().split('T')[0]);
+
+        // Load initial data
+        loadUsers();
         loadDetections();
-    });
-
-    $('#resetBtn').click(function() {
-        $('#filterForm')[0].reset();
-        currentPage = 1;
-        loadDetections();
-    });
-
-    // Load statistics when modal opens
-    $('#statisticsModal').on('shown.bs.modal', function () {
         loadStatistics();
-    });
-});
 
-function loadUsers() {
-    $.get('/api/users/list', function(users) {
-        const userSelect = $('#userId');
-        users.forEach(user => {
-            if (user.identifier !== 'unknown') {
-                userSelect.append(new Option(user.username, user._id));
-            }
+        // Event handlers
+        $('#filterBtn').click(function () {
+            currentPage = 1;
+            loadDetections();
+        });
+
+        $('#resetBtn').click(function () {
+            $('#filterForm')[0].reset();
+            currentPage = 1;
+            loadDetections();
+        });
+
+        // Load statistics when modal opens
+        $('#statisticsModal').on('shown.bs.modal', function () {
+            loadStatistics();
         });
     });
-}
 
-function loadDetections() {
-    const params = {
-        page: currentPage,
-        per_page: perPage,
-        date_from: $('#dateFrom').val(),
-        date_to: $('#dateTo').val(),
-        user_id: $('#userId').val(),
-        sort_by: $('#sortBy').val(),
-        sort_order: $('#sortOrder').val()
-    };
+    function loadUsers() {
+        $.get('/api/users/list', function (users) {
+            const userSelect = $('#userId');
+            users.forEach(user => {
+                if (user.identifier !== 'unknown') {
+                    userSelect.append(new Option(user.username, user._id));
+                }
+            });
+        });
+    }
 
-    $.get('/api/detect/list', params, function(response) {
-        const detectionList = $('#detectionList');
-        detectionList.empty();
+    function loadDetections() {
+        const params = {
+            page: currentPage,
+            per_page: perPage,
+            date_from: $('#dateFrom').val(),
+            date_to: $('#dateTo').val(),
+            user_id: $('#userId').val(),
+            sort_by: $('#sortBy').val(),
+            sort_order: $('#sortOrder').val()
+        };
 
-        response.detections.forEach(detection => {
-            const row = `
-                <tr>
+        $.get('/api/detect/list', params, function (response) {
+            const detectionList = $('#detectionList');
+            detectionList.empty();
+
+            response.detections.forEach(detection => {
+                const row = `
+                <tr id="detection-${detection.id}">
                     <td>${detection.time_stamp}</td>
                     <td>${detection.user_name}</td>
                     <td>${detection.camera_name}</td>
                     <td>
-                        <img src="/api/database-files/${detection.user_name !== 'Unknown' ? detection.truth_image_path : detection.face_image_path}" 
+                        <img src="/api/database-files/${detection.face_image_path}" 
                             class="img-thumbnail" 
                             style="height: 50px; width: 50px; object-fit: cover;"
-                            alt="Face Image"
+                            alt="Face Image">
                     </td>
                     <td>
-                        <button class="btn btn-info btn-sm" onclick="viewDetection('${detection.id}')">
+                        <button class="btn btn-info btn-sm me-1" onclick="viewDetection('${detection.id}')">
                             <i class="fas fa-eye"></i> View
                         </button>
+                        ${detection.user_name === 'Unknown' ? `
+                            <button class="btn btn-success btn-sm add-to-user-btn" onclick="showAddToUserModal('${detection.id}')">
+                                <i class="fas fa-user-plus"></i> Add to User
+                            </button>
+                        ` : ''}
                     </td>
                 </tr>
             `;
-            detectionList.append(row);
+                detectionList.append(row);
+            });
+
+            // Update counters
+            $('#currentCount').text(response.detections.length);
+            $('#totalCount').text(response.total_records);
+
+            // Update pagination
+            updatePagination(response.total_pages, response.current_page);
         });
+    }
 
-        // Update counters
-        $('#currentCount').text(response.detections.length);
-        $('#totalCount').text(response.total_records);
+    function updatePagination(totalPages, currentPage) {
+        const pagination = $('#pagination');
+        pagination.empty();
 
-        // Update pagination
-        updatePagination(response.total_pages, response.current_page);
-    });
-}
-
-function updatePagination(totalPages, currentPage) {
-    const pagination = $('#pagination');
-    pagination.empty();
-
-    // Previous button
-    pagination.append(`
+        // Previous button
+        pagination.append(`
         <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
             <a class="page-link" href="#" onclick="changePage(${currentPage - 1})">
                 <i class="fas fa-chevron-left"></i>
@@ -295,61 +349,61 @@ function updatePagination(totalPages, currentPage) {
         </li>
     `);
 
-    // Page numbers
-    for (let i = 1; i <= totalPages; i++) {
-        if (
-            i === 1 || 
-            i === totalPages || 
-            (i >= currentPage - 2 && i <= currentPage + 2)
-        ) {
-            pagination.append(`
+        // Page numbers
+        for (let i = 1; i <= totalPages; i++) {
+            if (
+                i === 1 ||
+                i === totalPages ||
+                (i >= currentPage - 2 && i <= currentPage + 2)
+            ) {
+                pagination.append(`
                 <li class="page-item ${currentPage === i ? 'active' : ''}">
                     <a class="page-link" href="#" onclick="changePage(${i})">${i}</a>
                 </li>
             `);
-        } else if (
-            i === currentPage - 3 || 
-            i === currentPage + 3
-        ) {
-            pagination.append(`
+            } else if (
+                i === currentPage - 3 ||
+                i === currentPage + 3
+            ) {
+                pagination.append(`
                 <li class="page-item disabled">
                     <span class="page-link">...</span>
                 </li>
             `);
+            }
         }
-    }
 
-    // Next button
-    pagination.append(`
+        // Next button
+        pagination.append(`
         <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
             <a class="page-link" href="#" onclick="changePage(${currentPage + 1})">
                 <i class="fas fa-chevron-right"></i>
             </a>
         </li>
     `);
-}
+    }
 
-function changePage(page) {
-    currentPage = page;
-    loadDetections();
-}
-function viewDetection(detectionId) {
-    // Show loading state
-    const loadingHtml = `
+    function changePage(page) {
+        currentPage = page;
+        loadDetections();
+    }
+    function viewDetection(detectionId) {
+        // Show loading state
+        const loadingHtml = `
         <div class="text-center py-5">
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Loading...</span>
             </div>
         </div>
     `;
-    $('#viewDetectionModal .modal-body').html(loadingHtml);
-    $('#viewDetectionModal').modal('show');
+        $('#viewDetectionModal .modal-body').html(loadingHtml);
+        $('#viewDetectionModal').modal('show');
 
-    // Fetch detection details
-    $.get(`/api/detect/${detectionId}`)
-        .done(function(detection) {
-            // Prepare image HTML
-            const modalBody = `
+        // Fetch detection details
+        $.get(`/api/detect/${detectionId}`)
+            .done(function (detection) {
+                // Prepare image HTML
+                const modalBody = `
                 <div class="row">
                     <div class="col-md-6">
                         <h6>Original Image</h6>
@@ -387,129 +441,129 @@ function viewDetection(detectionId) {
                     </div>
                 </div>
             `;
-            
-            // Update modal content
-            $('#viewDetectionModal .modal-body').html(modalBody);
-        })
-        .fail(function(xhr) {
-            // Show error message
-            const errorMessage = xhr.responseJSON?.detail || 'Failed to load detection details';
-            const errorHtml = `
+
+                // Update modal content
+                $('#viewDetectionModal .modal-body').html(modalBody);
+            })
+            .fail(function (xhr) {
+                // Show error message
+                const errorMessage = xhr.responseJSON?.detail || 'Failed to load detection details';
+                const errorHtml = `
                 <div class="alert alert-danger" role="alert">
                     <i class="fas fa-exclamation-circle"></i> ${errorMessage}
                 </div>
             `;
-            $('#viewDetectionModal .modal-body').html(errorHtml);
-        });
-}
+                $('#viewDetectionModal .modal-body').html(errorHtml);
+            });
+    }
 
-function getConfidenceClass(distance) {
-    const confidence = 100 - distance;
-    if (confidence >= 90) return 'confidence-high';
-    if (confidence >= 70) return 'confidence-medium';
-    return 'confidence-low';
-}
+    function getConfidenceClass(distance) {
+        const confidence = 100 - distance;
+        if (confidence >= 90) return 'confidence-high';
+        if (confidence >= 70) return 'confidence-medium';
+        return 'confidence-low';
+    }
 
-function loadStatistics() {
-    // Load daily statistics
-    const dateFrom = $('#dateFrom').val();
-    const dateTo = $('#dateTo').val();
+    function loadStatistics() {
+        // Load daily statistics
+        const dateFrom = $('#dateFrom').val();
+        const dateTo = $('#dateTo').val();
 
-    $.get('/api/detect/stats/daily', { date_from: dateFrom, date_to: dateTo }, function(stats) {
-        new Chart($('#dailyChart'), {
-            type: 'line',
-            data: {
-                labels: stats.map(item => item.date),
-                datasets: [{
-                    label: 'Daily Detections',
-                    data: stats.map(item => item.count),
-                    borderColor: 'rgb(75, 192, 192)',
-                    tension: 0.1,
-                    fill: false
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            precision: 0
-                        }
-                    }
-                }
-            }
-        });
-    });
-
-    // Load user distribution
-    $.get('/api/detect/stats/users', function(stats) {
-        new Chart($('#userDistChart'), {
-            type: 'pie',
-            data: {
-                labels: stats.map(item => item.user_name),
-                datasets: [{
-                    data: stats.map(item => item.count),
-                    backgroundColor: [
-                        'rgb(255, 99, 132)',
-                        'rgb(54, 162, 235)',
-                        'rgb(255, 206, 86)',
-                        'rgb(75, 192, 192)',
-                        'rgb(153, 102, 255)'
-                    ]
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'right'
-                    }
-                }
-            }
-        });
-    });
-
-    // Load camera statistics
-    $.get('/api/detect/stats/cameras', function(stats) {
-        new Chart($('#cameraStatsChart'), {
-            type: 'bar',
-            data: {
-                labels: stats.map(item => item.camera_name),
-                datasets: [{
-                    label: 'Detections per Camera',
-                    data: stats.map(item => item.count),
-                    backgroundColor: 'rgb(75, 192, 192)'
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            precision: 0
-                        }
-                    }
+        $.get('/api/detect/stats/daily', { date_from: dateFrom, date_to: dateTo }, function (stats) {
+            new Chart($('#dailyChart'), {
+                type: 'line',
+                data: {
+                    labels: stats.map(item => item.date),
+                    datasets: [{
+                        label: 'Daily Detections',
+                        data: stats.map(item => item.count),
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1,
+                        fill: false
+                    }]
                 },
-                plugins: {
-                    legend: {
-                        display: false
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
                     }
                 }
-            }
+            });
         });
-    });
-}
 
-// Helper function to format numbers
-function formatNumber(num) {
-    return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')
-}
+        // Load user distribution
+        $.get('/api/detect/stats/users', function (stats) {
+            new Chart($('#userDistChart'), {
+                type: 'pie',
+                data: {
+                    labels: stats.map(item => item.user_name),
+                    datasets: [{
+                        data: stats.map(item => item.count),
+                        backgroundColor: [
+                            'rgb(255, 99, 132)',
+                            'rgb(54, 162, 235)',
+                            'rgb(255, 206, 86)',
+                            'rgb(75, 192, 192)',
+                            'rgb(153, 102, 255)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        }
+                    }
+                }
+            });
+        });
 
-// Add loading spinner
-function showLoading() {
-    const loadingHtml = `
+        // Load camera statistics
+        $.get('/api/detect/stats/cameras', function (stats) {
+            new Chart($('#cameraStatsChart'), {
+                type: 'bar',
+                data: {
+                    labels: stats.map(item => item.camera_name),
+                    datasets: [{
+                        label: 'Detections per Camera',
+                        data: stats.map(item => item.count),
+                        backgroundColor: 'rgb(75, 192, 192)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        });
+    }
+
+    // Helper function to format numbers
+    function formatNumber(num) {
+        return num.toString().replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1,')
+    }
+
+    // Add loading spinner
+    function showLoading() {
+        const loadingHtml = `
         <tr>
             <td colspan="5" class="text-center">
                 <div class="spinner-border text-primary" role="status">
@@ -518,12 +572,12 @@ function showLoading() {
             </td>
         </tr>
     `;
-    $('#detectionList').html(loadingHtml);
-}
+        $('#detectionList').html(loadingHtml);
+    }
 
-// Add error handling
-function handleError(error) {
-    const errorHtml = `
+    // Add error handling
+    function handleError(error) {
+        const errorHtml = `
         <tr>
             <td colspan="5" class="text-center text-danger">
                 <i class="fas fa-exclamation-circle"></i> 
@@ -531,97 +585,299 @@ function handleError(error) {
             </td>
         </tr>
     `;
-    $('#detectionList').html(errorHtml);
-}
+        $('#detectionList').html(errorHtml);
+    }
 
-// Register error handlers
-$(document).ajaxError(function(event, jqXHR, settings, error) {
-    console.error('Ajax error:', error);
-    handleError(jqXHR);
-});
+    // Register error handlers
+    $(document).ajaxError(function (event, jqXHR, settings, error) {
+        console.error('Ajax error:', error);
+        handleError(jqXHR);
+    });
 
-// Add export functionality
-function exportToCSV() {
-    const params = {
-        date_from: $('#dateFrom').val(),
-        date_to: $('#dateTo').val(),
-        user_id: $('#userId').val(),
-        sort_by: $('#sortBy').val(),
-        sort_order: $('#sortOrder').val(),
-        export: 'csv'
-    };
+    // Add export functionality
+    function exportToCSV() {
+        const params = {
+            date_from: $('#dateFrom').val(),
+            date_to: $('#dateTo').val(),
+            user_id: $('#userId').val(),
+            sort_by: $('#sortBy').val(),
+            sort_order: $('#sortOrder').val(),
+            export: 'csv'
+        };
 
-    const queryString = new URLSearchParams(params).toString();
-    window.location.href = `/api/detect/export?${queryString}`;
-}
+        const queryString = new URLSearchParams(params).toString();
+        window.location.href = `/api/detect/export?${queryString}`;
+    }
 
-// Add tooltip initialization
-$(function () {
-    $('[data-bs-toggle="tooltip"]').tooltip();
-});
+    // Add tooltip initialization
+    $(function () {
+        $('[data-bs-toggle="tooltip"]').tooltip();
+    });
 </script>
 
 <style>
-.card {
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-}
-
-.detection-image {
-    object-fit: cover;
-    width: 100%;
-    height: 300px;
-}
-
-.modal-body img {
-    width: 100%;
-    max-height: 400px;
-    object-fit: contain;
-}
-
-.table th {
-    background-color: #f8f9fa;
-}
-
-.pagination {
-    margin-bottom: 0;
-}
-
-.chart-container {
-    position: relative;
-    height: 300px;
-}
-
-.btn-icon {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.confidence-high {
-    color: #28a745;
-}
-
-.confidence-medium {
-    color: #ffc107;
-}
-
-.confidence-low {
-    color: #dc3545;
-}
-
-@media (max-width: 768px) {
-    .modal-dialog {
-        margin: 0.5rem;
+    .add-to-user-btn {
+        white-space: nowrap;
     }
-    
-    .table-responsive {
-        font-size: 0.875rem;
+
+    #userImages img {
+        width: 100%;
+        height: 100px;
+        object-fit: cover;
+        border-radius: 4px;
     }
-    
-    .btn-sm {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.75rem;
+
+    #detectedFacePreview {
+        max-height: 300px;
+        object-fit: contain;
+        border-radius: 4px;
     }
-}
+
+    .alert-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+    }
+
+    .custom-alert {
+        min-width: 300px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .card {
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+
+    .detection-image {
+        object-fit: cover;
+        width: 100%;
+        height: 300px;
+    }
+
+    .modal-body img {
+        width: 100%;
+        max-height: 400px;
+        object-fit: contain;
+    }
+
+    .table th {
+        background-color: #f8f9fa;
+    }
+
+    .pagination {
+        margin-bottom: 0;
+    }
+
+    .chart-container {
+        position: relative;
+        height: 300px;
+    }
+
+    .btn-icon {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .confidence-high {
+        color: #28a745;
+    }
+
+    .confidence-medium {
+        color: #ffc107;
+    }
+
+    .confidence-low {
+        color: #dc3545;
+    }
+
+    @media (max-width: 768px) {
+        .modal-dialog {
+            margin: 0.5rem;
+        }
+
+        .table-responsive {
+            font-size: 0.875rem;
+        }
+
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+    }
 </style>
+
+<script>
+    // Add alert container to body
+    $('body').append('<div class="alert-container"></div>');
+
+    function showAlert(type, message, timeout = 5000) {
+        const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show custom-alert" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+
+        const alertElement = $(alertHtml);
+        $('.alert-container').append(alertElement);
+
+        if (timeout) {
+            setTimeout(() => {
+                alertElement.alert('close');
+            }, timeout);
+        }
+    }
+
+    let currentDetectionData = null;
+
+    function loadUsers() {
+        $.get('/api/users/list', function (users) {
+            const select = $('#selectUser');
+            select.empty().append('<option value="">Choose a user...</option>');
+
+            users.forEach(user => {
+                if (user.identifier !== 'unknown') {
+                    select.append(`<option value="${user.id}">${user.username}</option>`);
+                }
+            });
+        });
+    }
+
+    function loadUserImages(userId) {
+        const container = $('#userImages');
+        container.empty();
+
+        $.get(`/api/users/${userId}/images`, function (images) {
+            if (images && images.length > 0) {
+                images.forEach(imagePath => {
+                    container.append(`
+                    <div class="col-4">
+                        <img src="/api/database-files/${imagePath}" 
+                                class="img-thumbnail" 
+                                alt="User face">
+                    </div>
+                `);
+                });
+            } else {
+                container.html('<div class="col-12"><p class="text-muted">No images yet</p></div>');
+            }
+            $('#userPreview').removeClass('d-none');
+        });
+    }
+
+    // Function để hiển thị modal
+    function showAddToUserModal(detectionId) {
+        $('#selectUser').val('');
+        $('#userPreview').addClass('d-none');
+        $('#userImages').empty();
+        $('#confirmAddToUser').prop('disabled', false)
+            .find('.spinner-border').addClass('d-none');
+
+        $.get(`/api/detect/${detectionId}`, function (detection) {
+            currentDetectionData = detection;
+            $('#detectedFacePreview').attr('src', `/api/database-files/${detection.detect_image_path}`);
+            loadUsers();
+            $('#addToUserModal').modal('show');
+        });
+    }
+
+    // Xử lý khi chọn user
+    $('#selectUser').change(function () {
+        const userId = $(this).val();
+        if (userId) {
+            loadUserImages(userId);
+        } else {
+            $('#userPreview').addClass('d-none');
+        }
+    });
+
+    // Xử lý submit form
+    $('#confirmAddToUser').click(async function () {
+        const userId = $('#selectUser').val();
+        if (!userId || !currentDetectionData) {
+            showAlert('warning', 'Please select a user');
+            return;
+        }
+
+        try {
+            // Get user details first 
+            const userResponse = await fetch(`/api/users/${userId}`);
+            const userData = await userResponse.json();
+
+            // Show loading state
+            const btn = $(this);
+            btn.prop('disabled', true)
+                .find('.spinner-border').removeClass('d-none');
+
+            // Create form data with existing user info
+            const formData = new FormData();
+            formData.append('identifier', userData.identifier);
+            formData.append('user_name', userData.username);
+
+            // Get the detect image
+            const response = await fetch(`/api/database-files/${currentDetectionData.detect_image_path}`);
+            const blob = await response.blob();
+            formData.append('files', blob, 'detected_person.jpg');
+
+            // Upload using existing API
+            const uploadResponse = await fetch('/api/users/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await uploadResponse.json();
+
+            if (result.success) {
+                // Update detection log with new user
+                const updateLogResponse = await fetch(`/api/detect/${currentDetectionData.id}/update_user`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        user_name: userData.username
+                    })
+                });
+
+                if (!updateLogResponse.ok) {
+                    showAlert('warning', 'Added to user but failed to update detection log');
+                } else {
+                    showAlert('success', `Successfully added detection to user ${userData.username}`);
+                }
+
+                $('#addToUserModal').modal('hide');
+                // Refresh detection list
+                loadDetections();
+            } else {
+                let errorMessage = 'Failed to add detection to user';
+                if (result.details) {
+                    errorMessage += ': ' + result.details.map(d => d.error).join(', ');
+                }
+                showAlert('danger', errorMessage);
+            }
+
+        } catch (error) {
+            console.error('Error:', error);
+            showAlert('danger', 'Error adding detection to user: ' + (error.message || 'Unknown error'));
+        } finally {
+            btn.prop('disabled', false)
+                .find('.spinner-border').addClass('d-none');
+        }
+    });
+
+    // Add button to each detection row
+    function addActionButton(detection) {
+        const actionCell = $(`#detection-${detection.id} td:last-child`);
+        actionCell.append(`
+        <button class="btn btn-success btn-sm ms-2 add-to-user-btn" 
+                onclick="showAddToUserModal('${detection.id}')"
+                title="Add to User's Face Images">
+            <i class="fas fa-user-plus"></i> Add to User
+        </button>
+    `);
+    }
+</script>
 {% endblock %}

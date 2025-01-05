@@ -125,3 +125,16 @@ class DetectionService:
         except Exception as e:
             print(f"Error getting camera stats: {str(e)}")
             return []
+
+    async def update_detection_user(self, detection_id: str, update_data: dict) -> bool:
+        """Update user info in detection log"""
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.put(
+                    f"{self.database_url}/detected/{detection_id}/update_user",
+                    json=update_data,
+                ) as response:
+                    return response.status == 200
+        except Exception as e:
+            print(f"Error updating detection user: {str(e)}")
+            return False

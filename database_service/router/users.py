@@ -265,25 +265,25 @@ async def upload_user_images(
     service: UserService = Depends(UserService),
 ):
     """Add new images to existing user"""
-    try:
-        # Process and save new images
-        new_image_paths = []
-        for file in files:
-            if not file.content_type.startswith("image/"):
-                raise HTTPException(
-                    status_code=400, detail=f"File {file.filename} is not an image"
-                )
+    # try:
+    # Process and save new images
+    new_image_paths = []
+    for file in files:
+        if not file.content_type.startswith("image/"):
+            raise HTTPException(
+                status_code=400, detail=f"File {file.filename} is not an image"
+            )
 
-            content = await file.read()
-            new_path = service.save_user_image(content)
-            new_image_paths.append(new_path)
+        content = await file.read()
+        new_path = service.save_user_image(content)
+        new_image_paths.append(new_path)
 
-        # Update user's image list
-        success = await service.add_user_images(user_id, new_image_paths)
-        if not success:
-            raise HTTPException(status_code=404, detail="User not found")
+    # Update user's image list
+    success = await service.add_user_images(user_id, new_image_paths)
+    if not success:
+        raise HTTPException(status_code=404, detail="User not found")
 
-        return {"success": True, "added_images": new_image_paths}
+    return {"success": True, "added_images": new_image_paths}
 
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    # except ValueError as e:
+    #     raise HTTPException(status_code=400, detail=str(e))

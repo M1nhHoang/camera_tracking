@@ -234,3 +234,13 @@ async def get_detection(detection_id: str):
         return detection
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/{detection_id}/update_user")
+async def update_detection_user(detection_id: str, update_data: dict):
+    """Update user info in detection log"""
+    service = DetectedService()
+    success = await service.update_detection_user(detection_id, update_data)
+    if not success:
+        raise HTTPException(status_code=404, detail="Detection not found")
+    return {"success": True}

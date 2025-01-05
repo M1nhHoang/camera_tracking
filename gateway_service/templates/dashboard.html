@@ -1,0 +1,364 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Users</h5>
+                    <h2 class="card-text" id="totalUsers">0</h2>
+                    <p class="mb-0"><span id="newUsers">0</span> new this week</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Active Cameras</h5>
+                    <h2 class="card-text" id="activeCameras">0</h2>
+                    <p class="mb-0"><span id="totalCameras">0</span> total cameras</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Today's Detections</h5>
+                    <h2 class="card-text" id="todayDetections">0</h2>
+                    <p class="mb-0"><span id="detectionChange">0%</span> vs. yesterday</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <h5 class="card-title">System Status</h5>
+                    <h2 class="card-text" id="systemUptime">00:00:00</h2>
+                    <p class="mb-0">All services running</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Detection Activity</h5>
+                    <div style="height: 300px;">
+                        <canvas id="detectionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Camera Distribution</h5>
+                    <div style="height: 300px;">
+                        <canvas id="cameraChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity and Alerts -->
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Recent Activity</h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="recentActivityTable">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Event</th>
+                                    <th>Location</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Activity rows will be dynamically added here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">System Alerts</h5>
+                    <div id="alertsList">
+                        <!-- Alerts will be dynamically added here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Declare chart variables globally
+    let detectionChart = null;
+    let cameraChart = null;
+
+    $(document).ready(function () {
+        // Initial load
+        loadDashboardData();
+
+        // Set up auto-refresh
+        setInterval(loadDashboardData, 60000); // Refresh every minute
+
+        // Update system uptime
+        setInterval(updateSystemUptime, 1000);
+
+        // Add resize handler
+        $(window).resize(function () {
+            if (detectionChart) detectionChart.resize();
+            if (cameraChart) cameraChart.resize();
+        });
+    });
+
+    async function loadDashboardData() {
+        try {
+            // Load all data in parallel
+            const [summaryData, detectionData, cameraData, activityData, alertsData] = await Promise.all([
+                $.get('/api/dashboard/summary'),
+                $.get('/api/dashboard/detection-activity'),
+                $.get('/api/dashboard/camera-distribution'),
+                $.get('/api/dashboard/recent-activity'),
+                $.get('/api/dashboard/alerts')
+            ]);
+
+            // Update summary
+            $('#totalUsers').text(summaryData.total_users);
+            $('#newUsers').text(summaryData.new_users);
+            $('#activeCameras').text(summaryData.active_cameras);
+            $('#totalCameras').text(summaryData.total_cameras);
+            $('#todayDetections').text(summaryData.today_detections);
+            $('#detectionChange').text(summaryData.detection_change + '%');
+
+            // Update charts and other components
+            updateDetectionChart(detectionData);
+            updateCameraChart(cameraData);
+            updateRecentActivity(activityData);
+            updateSystemAlerts(alertsData);
+
+        } catch (error) {
+            console.error('Error loading dashboard data:', error);
+            // Optionally show error message to user
+        }
+    }
+
+    function updateDetectionChart(data) {
+        const ctx = document.getElementById('detectionChart');
+        if (!ctx) return;  // Exit if canvas doesn't exist
+
+        // Destroy existing chart if it exists
+        if (detectionChart) {
+            detectionChart.destroy();
+        }
+
+        detectionChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'Detections',
+                    data: data.values,
+                    borderColor: 'rgb(75, 192, 192)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                },
+                interaction: {
+                    mode: 'nearest',
+                    axis: 'x',
+                    intersect: false
+                }
+            }
+        });
+    }
+
+    function updateCameraChart(data) {
+        const ctx = document.getElementById('cameraChart');
+        if (!ctx) return;  // Exit if canvas doesn't exist
+
+        // Destroy existing chart if it exists
+        if (cameraChart) {
+            cameraChart.destroy();
+        }
+
+        cameraChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    data: data.values,
+                    backgroundColor: [
+                        'rgb(75, 192, 192)',  // Teal
+                        'rgb(255, 99, 132)',  // Pink
+                        'rgb(255, 205, 86)',  // Yellow
+                        'rgb(54, 162, 235)'   // Blue
+                    ],
+                    borderWidth: 1,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        }
+                    }
+                },
+                layout: {
+                    padding: {
+                        left: 10,
+                        right: 10
+                    }
+                },
+                animation: {
+                    animateScale: true
+                }
+            }
+        });
+    }
+
+    function updateRecentActivity(data) {
+        const tbody = $('#recentActivityTable tbody');
+        tbody.empty();
+
+        data.forEach(activity => {
+            const statusClass = activity.status === 'success' ? 'text-success' : 'text-danger';
+            const row = `
+            <tr>
+                <td>${activity.time}</td>
+                <td>${activity.event}</td>
+                <td>${activity.location}</td>
+                <td><span class="${statusClass}">${activity.status}</span></td>
+            </tr>
+        `;
+            tbody.append(row);
+        });
+    }
+
+    function updateSystemAlerts(data) {
+        const alertsList = $('#alertsList');
+        alertsList.empty();
+
+        data.forEach(alert => {
+            const alertClass = alert.level === 'error' ? 'danger' :
+                alert.level === 'warning' ? 'warning' : 'info';
+            const alertHtml = `
+            <div class="alert alert-${alertClass} alert-dismissible fade show" role="alert">
+                <strong>${alert.title}</strong>
+                <p class="mb-0">${alert.message}</p>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+            alertsList.append(alertHtml);
+        });
+    }
+
+    let uptimeSeconds = 0;
+    function updateSystemUptime() {
+        uptimeSeconds++;
+        const hours = Math.floor(uptimeSeconds / 3600);
+        const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+        const seconds = uptimeSeconds % 60;
+
+        const uptime = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        $('#systemUptime').text(uptime);
+    }
+</script>
+
+<style>
+    .card {
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        margin-bottom: 1rem;
+    }
+
+    .card-title {
+        margin-bottom: 1.5rem;
+        font-weight: 500;
+    }
+
+    .table th {
+        font-weight: 500;
+        background-color: #f8f9fa;
+    }
+
+    #alertsList .alert {
+        margin-bottom: 0.5rem;
+    }
+
+    canvas {
+        min-height: 300px;
+    }
+
+    .bg-primary {
+        background: linear-gradient(45deg, #4e73df, #224abe) !important;
+    }
+
+    .bg-success {
+        background: linear-gradient(45deg, #1cc88a, #13855c) !important;
+    }
+
+    .bg-info {
+        background: linear-gradient(45deg, #36b9cc, #258391) !important;
+    }
+
+    .bg-warning {
+        background: linear-gradient(45deg, #f6c23e, #dda20a) !important;
+    }
+
+    @media (max-width: 768px) {
+        .card {
+            margin-bottom: 1rem;
+        }
+
+        canvas {
+            min-height: 200px;
+        }
+    }
+</style>
+{% endblock %}

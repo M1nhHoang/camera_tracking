@@ -178,64 +178,64 @@ class UserService:
 
     async def upload_user_images(self, user_id: str, files: List[UploadFile]) -> Dict:
         """Upload and process images for user"""
-        try:
-            # First get user details
-            user = await self.get_user_by_id(user_id)
-            if not user:
-                raise ValueError(f"User with ID {user_id} not found")
+        # try:
+        # First get user details
+        user = await self.get_user_by_id(user_id)
+        if not user:
+            raise ValueError(f"User with ID {user_id} not found")
 
-            # Upload to database service
-            async with aiohttp.ClientSession() as session:
-                # Database service upload
-                db_form = aiohttp.FormData()
-                for file in files:
-                    db_form.add_field(
-                        "files",
-                        await file.read(),
-                        filename=file.filename,
-                        content_type=file.content_type,
+        # Upload to database service
+        async with aiohttp.ClientSession() as session:
+            # Database service upload
+            db_form = aiohttp.FormData()
+            for file in files:
+                db_form.add_field(
+                    "files",
+                    await file.read(),
+                    filename=file.filename,
+                    content_type=file.content_type,
+                )
+                # Reset file cursor for next use
+                await file.seek(0)
+
+            async with session.post(
+                f"{self.database_url}/users/{user_id}/images/upload", data=db_form
+            ) as response:
+                if response.status != 200:
+                    raise ValueError(await response.text())
+                db_result = await response.json()
+
+            # Face identify service upload
+            identify_form = aiohttp.FormData()
+            identify_form.add_field("identifier", user["identifier"])
+            identify_form.add_field("user_name", user["username"])
+            for file in files:
+                identify_form.add_field(
+                    "files",
+                    await file.read(),
+                    filename=file.filename,
+                    content_type=file.content_type,
+                )
+
+            async with session.post(
+                f"{self.face_identify_url}/users/{user_id}/images/upload",
+                data=identify_form,
+            ) as response:
+                if response.status != 200:
+                    # Log warning but don't fail completely
+                    print(
+                        f"Warning: Face identify processing failed: {await response.text()}"
                     )
-                    # Reset file cursor for next use
-                    await file.seek(0)
+                identify_result = await response.json()
 
-                async with session.post(
-                    f"{self.database_url}/users/{user_id}/images/upload", data=db_form
-                ) as response:
-                    if response.status != 200:
-                        raise ValueError(await response.text())
-                    db_result = await response.json()
+            return {
+                "success": True,
+                "database_result": db_result,
+                "identify_result": identify_result,
+            }
 
-                # Face identify service upload
-                identify_form = aiohttp.FormData()
-                identify_form.add_field("identifier", user["identifier"])
-                identify_form.add_field("user_name", user["username"])
-                for file in files:
-                    identify_form.add_field(
-                        "files",
-                        await file.read(),
-                        filename=file.filename,
-                        content_type=file.content_type,
-                    )
-
-                async with session.post(
-                    f"{self.face_identify_url}/users/{user_id}/images/upload",
-                    data=identify_form,
-                ) as response:
-                    if response.status != 200:
-                        # Log warning but don't fail completely
-                        print(
-                            f"Warning: Face identify processing failed: {await response.text()}"
-                        )
-                    identify_result = await response.json()
-
-                return {
-                    "success": True,
-                    "database_result": db_result,
-                    "identify_result": identify_result,
-                }
-
-        except Exception as e:
-            raise ValueError(f"Error uploading images: {str(e)}")
+        # except Exception as e:
+        #     raise ValueError(f"Error uploading images: {str(e)}")
 
     async def process_user_images(self, user_id: str, image_paths: List[str]) -> Dict:
         """Process images with face identify service"""
@@ -252,3 +252,12 @@ class UserService:
                     # Log error but don't fail
                     print(f"Warning: Failed to process images: {await response.text()}")
                 return await response.json()
+
+    async def get_user(self, user_id: str) -> Optional[Dict]:
+        """Get user details by ID"""
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"{self.database_url}/users/{user_id}") as response:
+                if response.status == 200:
+                    user = await response.json()
+                    return self._format_user_response(user)
+                return None

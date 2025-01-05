@@ -53,7 +53,7 @@ class DetectedService:
             unknow_user_id = UserService().get_unknown_user_id()
 
             # check is detect user
-            if existing_record["user_id"] == unknow_user_id:
+            if existing_record["user_id"] != unknow_user_id:
                 return None
 
             # get image path
@@ -425,3 +425,18 @@ class DetectedService:
         camera_db = MongoDBManager(collection_name="cameras")
         camera = camera_db.find_one({"_id": camera_id})
         return camera["name"] if camera else "Unknown"
+
+    async def update_detection_user(self, detection_id: str, update_data: dict) -> bool:
+        """Update user info in detection"""
+        try:
+            detection_id_obj = ObjectId(detection_id)
+            update_data = {
+                "user_id": ObjectId(update_data["user_id"]),
+                "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }
+
+            result = self.db_manager.update_one({"_id": detection_id_obj}, update_data)
+            return result.modified_count > 0
+        except Exception as e:
+            print(f"Error updating detection user: {str(e)}")
+            return False

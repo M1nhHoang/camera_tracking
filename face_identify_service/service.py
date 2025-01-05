@@ -22,7 +22,7 @@ class FaceIdentifyService:
         embedding_service: dict,
         vector_db_service: dict,
         model_path: str,
-        conf_threshold=0.7,
+        conf_threshold=0.85,
     ):
         # Init service info
         self.database_name = database_service["name"]
