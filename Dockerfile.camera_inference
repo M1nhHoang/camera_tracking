@@ -27,7 +27,8 @@ RUN pip3 install protobuf==3.20.3
 WORKDIR /camera_inference_service
 
 # start app
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 5000 --reload"]
+# CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 5000 --reload"]
+CMD ["python3", "main.py"]
 
 ### build this service
 # build docker image
@@ -35,11 +36,3 @@ CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 5000 --reload"]
 
 # build and run
 ## docker run --gpus all -it --name camera_inference_service --net camera_track_network -v D:\camera\data\demo\camera_inference_service:/camera_inference_service -p 5000:5000 camera_inference
-
-
-### build database
-# build docker image
-## docker pull mongo
-
-# build and run
-## docker run -it --name database  --net camera_track_network -p 27017:27017 -d mongo

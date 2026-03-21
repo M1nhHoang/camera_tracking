@@ -1,0 +1,7 @@
+numpy==1.23.5
+opencv-python==4.10.0.84
+fastapi==0.111.0
+uvicorn==0.23.2
+requests==2.32.3
+pymongo==4.8.0
+Pillow==10.4.0

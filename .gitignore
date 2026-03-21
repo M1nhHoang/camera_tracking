@@ -40,3 +40,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# data folder
+_data/
+_static_files/
