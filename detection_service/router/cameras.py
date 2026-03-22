@@ -20,19 +20,17 @@ class CameraConfig(BaseModel):
 
 # These will be injected from main.py at startup
 camera_services: dict = {}
-services: dict = {}
 shared_model: SharedDetectionModel = None
 grpc_client: RecognitionGrpcClient = None
 
 
 def init_router(
-    _camera_services: dict, _services: dict, _shared_model: SharedDetectionModel,
+    _camera_services: dict, _shared_model: SharedDetectionModel,
     _grpc_client: RecognitionGrpcClient = None,
 ):
     """Inject shared state from main.py into this router module."""
-    global camera_services, services, shared_model, grpc_client
+    global camera_services, shared_model, grpc_client
     camera_services = _camera_services
-    services = _services
     shared_model = _shared_model
     grpc_client = _grpc_client
 
@@ -42,7 +40,7 @@ async def add_camera(config: CameraConfig):
     """Add new camera to monitoring"""
     try:
         service = DetectionService.create_from_config(
-            config=config.model_dump(), services=services,
+            config=config.model_dump(),
             shared_model=shared_model, grpc_client=grpc_client,
         )
         camera_services[config.camera_id] = service

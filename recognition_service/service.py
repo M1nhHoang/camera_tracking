@@ -426,12 +426,18 @@ class RecognitionService:
             distances = sreach_results["distances"][0][0]
             metadata = sreach_results["metadatas"][0][0]
 
+            # Determine identification result
+            is_matched = distances < detect_threshold
+            matched_user_id = metadata["user_id"] if is_matched else None
+            matched_user_name = metadata.get("user_name", "Unknown") if is_matched else "Unknown"
+
+            # Cache result for gRPC GetTrackingInfo
+            from grpc_server import tracking_cache
+            tracking_cache.set(detect_id, matched_user_name, not is_matched)
+
             # Send tracking data to database
-            # Database decides whether to override based on image quality + distance
             tracking_data = {
-                "user_id": (
-                    metadata["user_id"] if distances < detect_threshold else None
-                ),
+                "user_id": matched_user_id,
                 "detect_id": detect_id,
                 "camera_id": camera_id,
                 "origin_image": self.convert_image_to_base64(origin_image),

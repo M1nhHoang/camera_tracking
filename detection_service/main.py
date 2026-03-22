@@ -7,10 +7,8 @@ from router.cameras import router as cameras_router, init_router, CameraConfig
 
 app = FastAPI()
 
-# Service configurations
-services = {
-    "database_service": {"hostname": "database_service", "port": "8003"},
-}
+# Database service URL (only used for camera list at startup)
+DATABASE_URL = "http://database_service:8003"
 
 # Shared model configuration (loaded once, shared across all cameras)
 model_config = DetectionConfig(
@@ -29,7 +27,7 @@ grpc_client = RecognitionGrpcClient(host="recognition_service", port=50051)
 camera_services = {}
 
 # Inject shared state into router
-init_router(camera_services, services, shared_model, grpc_client)
+init_router(camera_services, shared_model, grpc_client)
 
 # Include routers
 app.include_router(cameras_router, prefix="/cameras", tags=["cameras"])
@@ -38,9 +36,7 @@ app.include_router(cameras_router, prefix="/cameras", tags=["cameras"])
 async def initialize_cameras():
     """Initialize cameras from database when service starts"""
     try:
-        response = requests.get(
-            f"http://{services['database_service']['hostname']}:{services['database_service']['port']}/cameras/list"
-        )
+        response = requests.get(f"{DATABASE_URL}/cameras/list")
 
         if response.status_code == 200:
             cameras = response.json()
@@ -54,7 +50,6 @@ async def initialize_cameras():
 
                 service = DetectionService.create_from_config(
                     config=config.model_dump(),
-                    services=services,
                     shared_model=shared_model,
                     grpc_client=grpc_client,
                 )

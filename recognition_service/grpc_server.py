@@ -1,5 +1,6 @@
 import grpc
 import logging
+import threading
 import numpy as np
 from concurrent import futures
 from PIL import Image
@@ -10,11 +11,51 @@ from generated import recognition_pb2, recognition_pb2_grpc
 GRPC_PORT = 50051
 
 
+class TrackingInfoCache:
+    """Thread-safe cache for identification results, keyed by detect_id."""
+
+    def __init__(self):
+        self._cache = {}
+        self._lock = threading.Lock()
+
+    def set(self, detect_id: int, user_name: str, is_unknown: bool):
+        with self._lock:
+            self._cache[detect_id] = {
+                "user_name": user_name,
+                "is_unknown": is_unknown,
+            }
+
+    def get(self, detect_id: int):
+        with self._lock:
+            return self._cache.get(detect_id)
+
+    def remove(self, detect_id: int):
+        with self._lock:
+            self._cache.pop(detect_id, None)
+
+
+# Singleton cache instance — shared between gRPC servicer and queue processing
+tracking_cache = TrackingInfoCache()
+
+
 class RecognitionGrpcServicer(recognition_pb2_grpc.RecognitionServiceServicer):
     """gRPC servicer that wraps the existing RecognitionService."""
 
     def __init__(self, recognition_service):
         self.recognition_service = recognition_service
+
+    def GetTrackingInfo(self, request, context):
+        """Return cached identification result for a detect_id."""
+        result = tracking_cache.get(request.detect_id)
+        if result is None:
+            return recognition_pb2.TrackingInfoResponse(
+                found=False, user_name="Unknown", is_unknown=True,
+            )
+        return recognition_pb2.TrackingInfoResponse(
+            found=True,
+            user_name=result["user_name"],
+            is_unknown=result["is_unknown"],
+        )
 
     def IdentifyFace(self, request, context):
         try:

@@ -115,20 +115,6 @@ class DetectedService:
                 }
             )
 
-    def get_tracking_info(self, detect_id):
-        tracking_id = self.traking_id_cache.get(detect_id, None)
-        if not tracking_id:
-            return "Peding detect...", True
-
-        detected = self.db_manager.find_one({"detect_id": tracking_id})
-        if not detected:
-            return "Peding detect...", True
-
-        user_id = detected.get("user_id")
-        user_name = UserService().get_user(user_id)["username"]
-
-        return user_name, user_name == "unknown"
-
     def get_daily_stats(self, date_from=None, date_to=None):
         """Get daily detection statistics"""
         pipeline = [

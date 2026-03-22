@@ -39,6 +39,11 @@ class RecognitionServiceStub(object):
                 request_serializer=recognition__pb2.FaceIdentificationRequest.SerializeToString,
                 response_deserializer=recognition__pb2.FaceIdentificationResponse.FromString,
                 _registered_method=True)
+        self.GetTrackingInfo = channel.unary_unary(
+                '/recognition.RecognitionService/GetTrackingInfo',
+                request_serializer=recognition__pb2.TrackingInfoRequest.SerializeToString,
+                response_deserializer=recognition__pb2.TrackingInfoResponse.FromString,
+                _registered_method=True)
 
 
 class RecognitionServiceServicer(object):
@@ -46,7 +51,13 @@ class RecognitionServiceServicer(object):
 
     def IdentifyFace(self, request, context):
         """Fire-and-forget face identification
-        Camera sends images, recognition queues them and returns immediately
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetTrackingInfo(self, request, context):
+        """Get cached tracking info for a detect_id (replaces HTTP call to database_service)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -59,6 +70,11 @@ def add_RecognitionServiceServicer_to_server(servicer, server):
                     servicer.IdentifyFace,
                     request_deserializer=recognition__pb2.FaceIdentificationRequest.FromString,
                     response_serializer=recognition__pb2.FaceIdentificationResponse.SerializeToString,
+            ),
+            'GetTrackingInfo': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetTrackingInfo,
+                    request_deserializer=recognition__pb2.TrackingInfoRequest.FromString,
+                    response_serializer=recognition__pb2.TrackingInfoResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -88,6 +104,33 @@ class RecognitionService(object):
             '/recognition.RecognitionService/IdentifyFace',
             recognition__pb2.FaceIdentificationRequest.SerializeToString,
             recognition__pb2.FaceIdentificationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetTrackingInfo(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/recognition.RecognitionService/GetTrackingInfo',
+            recognition__pb2.TrackingInfoRequest.SerializeToString,
+            recognition__pb2.TrackingInfoResponse.FromString,
             options,
             channel_credentials,
             insecure,

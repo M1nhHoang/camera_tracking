@@ -2,7 +2,6 @@ import cv2
 import time
 import torch
 import queue
-import requests
 import threading
 from typing import Optional, Generator, List, Dict
 
@@ -21,7 +20,6 @@ class DetectionService:
         self,
         camera_id: str,
         stream_url: str,
-        database_service: dict,
         shared_model: SharedDetectionModel,
         grpc_client: RecognitionGrpcClient,
         camera_name: Optional[str] = None,
@@ -54,9 +52,7 @@ class DetectionService:
         # Best-shot selection + TTL cache (per-camera)
         self.track_cache = TrackCache()
 
-        # Services
-        self.database_hostname = database_service["hostname"]
-        self.database_port = database_service["port"]
+        # gRPC client for recognition service
         self.grpc_client = grpc_client
 
         # Queue to store frames
@@ -64,14 +60,13 @@ class DetectionService:
 
     @classmethod
     def create_from_config(
-        cls, config: dict, services: dict, shared_model: SharedDetectionModel,
+        cls, config: dict, shared_model: SharedDetectionModel,
         grpc_client: RecognitionGrpcClient = None,
     ):
         """Create instance from config dictionary."""
         return cls(
             camera_id=config["camera_id"],
             stream_url=config["stream_url"],
-            database_service=services["database_service"],
             shared_model=shared_model,
             grpc_client=grpc_client,
             camera_name=config.get("name"),
@@ -104,17 +99,8 @@ class DetectionService:
             self.frame_queue.get()
 
     def get_tracking_info(self, track_id: int) -> Optional[dict]:
-        """Get tracking information from database"""
-        try:
-            response = requests.get(
-                f"http://{self.database_hostname}:{self.database_port}/detected/get_tracking_info",
-                params={"detect_id": track_id},
-            )
-            if response.status_code == 200:
-                return response.json()
-        except Exception as e:
-            print(f"Error getting tracking info: {e}")
-        return None
+        """Get tracking info from recognition service cache via gRPC."""
+        return self.grpc_client.get_tracking_info(track_id)
 
     def _match_track_to_face(
         self,

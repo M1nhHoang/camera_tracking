@@ -4,8 +4,10 @@ package recognition;
 
 service RecognitionService {
   // Fire-and-forget face identification
-  // Camera sends images, recognition queues them and returns immediately
   rpc IdentifyFace (FaceIdentificationRequest) returns (FaceIdentificationResponse);
+
+  // Get cached tracking info for a detect_id (replaces HTTP call to database_service)
+  rpc GetTrackingInfo (TrackingInfoRequest) returns (TrackingInfoResponse);
 }
 
 message FaceIdentificationRequest {
@@ -19,4 +21,14 @@ message FaceIdentificationRequest {
 message FaceIdentificationResponse {
   bool success = 1;
   string message = 2;
+}
+
+message TrackingInfoRequest {
+  int32 detect_id = 1;
+}
+
+message TrackingInfoResponse {
+  bool found = 1;
+  string user_name = 2;
+  bool is_unknown = 3;
 }

@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11recognition.proto\x12\x0brecognition\"\x81\x01\n\x19\x46\x61\x63\x65IdentificationRequest\x12\x11\n\tdetect_id\x18\x01 \x01(\x05\x12\x11\n\tcamera_id\x18\x02 \x01(\t\x12\x14\n\x0corigin_image\x18\x03 \x01(\x0c\x12\x14\n\x0c\x64\x65tect_image\x18\x04 \x01(\x0c\x12\x12\n\nface_image\x18\x05 \x01(\x0c\">\n\x1a\x46\x61\x63\x65IdentificationResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t2u\n\x12RecognitionService\x12_\n\x0cIdentifyFace\x12&.recognition.FaceIdentificationRequest\x1a\'.recognition.FaceIdentificationResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11recognition.proto\x12\x0brecognition\"\x81\x01\n\x19\x46\x61\x63\x65IdentificationRequest\x12\x11\n\tdetect_id\x18\x01 \x01(\x05\x12\x11\n\tcamera_id\x18\x02 \x01(\t\x12\x14\n\x0corigin_image\x18\x03 \x01(\x0c\x12\x14\n\x0c\x64\x65tect_image\x18\x04 \x01(\x0c\x12\x12\n\nface_image\x18\x05 \x01(\x0c\">\n\x1a\x46\x61\x63\x65IdentificationResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t\"(\n\x13TrackingInfoRequest\x12\x11\n\tdetect_id\x18\x01 \x01(\x05\"L\n\x14TrackingInfoResponse\x12\r\n\x05\x66ound\x18\x01 \x01(\x08\x12\x11\n\tuser_name\x18\x02 \x01(\t\x12\x12\n\nis_unknown\x18\x03 \x01(\x08\x32\xcd\x01\n\x12RecognitionService\x12_\n\x0cIdentifyFace\x12&.recognition.FaceIdentificationRequest\x1a\'.recognition.FaceIdentificationResponse\x12V\n\x0fGetTrackingInfo\x12 .recognition.TrackingInfoRequest\x1a!.recognition.TrackingInfoResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -35,6 +35,10 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_FACEIDENTIFICATIONREQUEST']._serialized_end=164
   _globals['_FACEIDENTIFICATIONRESPONSE']._serialized_start=166
   _globals['_FACEIDENTIFICATIONRESPONSE']._serialized_end=228
-  _globals['_RECOGNITIONSERVICE']._serialized_start=230
-  _globals['_RECOGNITIONSERVICE']._serialized_end=347
+  _globals['_TRACKINGINFOREQUEST']._serialized_start=230
+  _globals['_TRACKINGINFOREQUEST']._serialized_end=270
+  _globals['_TRACKINGINFORESPONSE']._serialized_start=272
+  _globals['_TRACKINGINFORESPONSE']._serialized_end=348
+  _globals['_RECOGNITIONSERVICE']._serialized_start=351
+  _globals['_RECOGNITIONSERVICE']._serialized_end=556
 # @@protoc_insertion_point(module_scope)

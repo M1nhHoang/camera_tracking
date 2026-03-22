@@ -58,5 +58,22 @@ class RecognitionGrpcClient:
         except grpc.RpcError as e:
             logging.error(f"IdentifyFace async error: {e.code()}: {e.details()}")
 
+    def get_tracking_info(self, detect_id: int) -> dict:
+        """
+        Get cached tracking info from recognition service.
+        Lightweight sync call — no images, just detect_id → user_name.
+        """
+        try:
+            request = recognition_pb2.TrackingInfoRequest(detect_id=detect_id)
+            response = self.stub.GetTrackingInfo(request, timeout=1.0)
+            if response.found:
+                return {
+                    "user_name": response.user_name,
+                    "is_unknown": response.is_unknown,
+                }
+        except grpc.RpcError as e:
+            logging.error(f"GetTrackingInfo error: {e.code()}: {e.details()}")
+        return None
+
     def close(self):
         self.channel.close()

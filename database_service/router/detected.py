@@ -50,21 +50,6 @@ async def tracking(
     return Response(status_code=200)
 
 
-@router.get("/get_tracking_info")
-async def get_tracking_info(detect_id: int = -1):
-    # valid
-    if detect_id == -1:
-        raise HTTPException(status_code=400, detail="Detect id is required.")
-
-    user_name, is_unknown = detected_service.get_tracking_info(detect_id)
-
-    return JSONResponse(
-        status_code=200, content={"user_name": user_name, "is_unknown": is_unknown}
-    )
-
-    # return recognition_service.get_name_by_detect_id(detect_id)
-
-
 @router.get("/list")
 async def list_detections(
     date_from: Optional[str] = None,
