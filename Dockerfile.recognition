@@ -1,31 +1,23 @@
-FROM camera_track_env
+FROM python:3.10-slim
 
-# cd to folder
+# System dependencies for opencv
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libglib2.0-0 libgl1-mesa-glx && \
+    rm -rf /var/lib/apt/lists/*
+
 WORKDIR /recognition_service
 
-# setup file
 COPY recognition_service/ .
 
-# install requirement
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Expose HTTP (FastAPI) and gRPC ports
+# HTTP (FastAPI) + gRPC ports
 EXPOSE 8002 50051
 
-# start app
-# CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 8002 --reload"]
 CMD ["python3", "main.py"]
 
-### build vector db
-# build docker image
-## docker pull chromadb/chroma
-
-# build and run
-## docker run -it --name vector_db_service --net camera_track_network -v D:\camera\chromadb:/chroma/chroma -p 8000:8000 chromadb/chroma
-
 ### build this service
-# build docker image
-## docker build -t recognition . -f Dockerfile.recognition
+# docker build -t recognition . -f Dockerfile.recognition
 
-# build and run
-## docker run --gpus all -it --name recognition_service --net camera_track_network -v D:\camera\data\demo\recognition_service:/recognition_service -p 8002:8002 -p 50051:50051 recognition
+# run (no GPU needed — recognition is orchestrator only)
+# docker run -it --name recognition_service --net camera_track_network -v ./static_files:/static_files -p 8002:8002 -p 50051:50051 recognition

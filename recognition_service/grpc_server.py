@@ -66,25 +66,18 @@ class RecognitionGrpcServicer(recognition_pb2_grpc.RecognitionServiceServicer):
                     success=False, message="detect_id is required"
                 )
 
-            # Decode JPEG bytes → numpy arrays
-            origin_image = np.array(
-                Image.open(BytesIO(request.origin_image)).convert("RGB")
-            )
-            detect_image = np.array(
-                Image.open(BytesIO(request.detect_image)).convert("RGB")
-            )
-
+            # Face image: decode to numpy (needed for embedding)
             face_image_arr = None
             if len(request.face_image) > 0:
                 face_image_arr = np.array(
                     Image.open(BytesIO(request.face_image)).convert("RGB")
                 )
 
-            # Enqueue for async processing (same as HTTP endpoint)
+            # Origin + detect: keep as raw JPEG bytes (saved directly to disk)
             self.recognition_service.process_detect_queue(
                 request.detect_id,
-                origin_image,
-                detect_image,
+                origin_image_bytes=request.origin_image,
+                detect_image_bytes=request.detect_image,
                 camera_id=request.camera_id,
                 face_image=face_image_arr,
             )
