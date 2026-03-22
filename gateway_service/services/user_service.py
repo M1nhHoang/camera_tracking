@@ -9,7 +9,7 @@ class UserService:
     def __init__(self):
         self.database_url = settings.DATABASE_SERVICE_URL
         self.database_static_url = settings.DATABASE_STATIC_URL
-        self.face_identify_url = settings.FACE_IDENTIFY_SERVICE_URL
+        self.recognition_url = settings.RECOGNITION_SERVICE_URL
 
     def _format_user_response(self, user: Dict) -> Dict:
         """Format user response to ensure consistent id fields and image paths"""
@@ -86,10 +86,10 @@ class UserService:
                     content_type=file.content_type,
                 )
 
-            # Upload to face identify service
+            # Upload to recognition service
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f"{self.face_identify_url}/face_upload",
+                    f"{self.recognition_url}/face_upload",
                     data=form_data,
                     headers={"Accept": "application/json"},
                 ) as response:
@@ -113,9 +113,9 @@ class UserService:
         """Delete user and associated data"""
         try:
             async with aiohttp.ClientSession() as session:
-                # Delete user from face identify service first
+                # Delete user from recognition service first
                 async with session.delete(
-                    f"{self.face_identify_url}/users/{user_id}"
+                    f"{self.recognition_url}/users/{user_id}"
                 ) as response:
                     if response.status not in [
                         200,
@@ -123,7 +123,7 @@ class UserService:
                     ]:  # Allow 404 as user might not have embeddings
                         error_text = await response.text()
                         print(
-                            f"Error deleting from face identify service: {error_text}"
+                            f"Error deleting from recognition service: {error_text}"
                         )
                         return False
 
@@ -169,10 +169,10 @@ class UserService:
                 return response.status == 200
 
     async def delete_user_image_embedding(self, user_id: str, image_path: str) -> bool:
-        """Delete image embedding from face identify service"""
+        """Delete image embedding from recognition service"""
         async with aiohttp.ClientSession() as session:
             async with session.delete(
-                f"{self.face_identify_url}/users/{user_id}/images/{image_path}"
+                f"{self.recognition_url}/users/{user_id}/images/{image_path}"
             ) as response:
                 return response.status == 200
 
@@ -218,7 +218,7 @@ class UserService:
                 )
 
             async with session.post(
-                f"{self.face_identify_url}/users/{user_id}/images/upload",
+                f"{self.recognition_url}/users/{user_id}/images/upload",
                 data=identify_form,
             ) as response:
                 if response.status != 200:
@@ -238,7 +238,7 @@ class UserService:
         #     raise ValueError(f"Error uploading images: {str(e)}")
 
     async def process_user_images(self, user_id: str, image_paths: List[str]) -> Dict:
-        """Process images with face identify service"""
+        """Process images with recognition service"""
         async with aiohttp.ClientSession() as session:
             form = aiohttp.FormData()
             form.add_field("user_id", user_id)
@@ -246,7 +246,7 @@ class UserService:
                 form.add_field("image_paths", path)
 
             async with session.post(
-                f"{self.face_identify_url}/process_images", data=form
+                f"{self.recognition_url}/process_images", data=form
             ) as response:
                 if response.status != 200:
                     # Log error but don't fail

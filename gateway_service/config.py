@@ -8,7 +8,7 @@ class Settings(BaseSettings):
 
     # Service URLs
     DATABASE_SERVICE_URL: str = "http://database_service:8003"
-    FACE_IDENTIFY_SERVICE_URL: str = "http://face_identify_service:8002"
+    RECOGNITION_SERVICE_URL: str = "http://recognition_service:8002"
     FACE_EMBEDDING_SERVICE_URL: str = "http://face_embedding_service:8001"
     CAMERA_INFERENCE_SERVICE_URL: str = "http://camera_inference_service:5000"
 

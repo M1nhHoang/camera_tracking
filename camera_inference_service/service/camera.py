@@ -21,7 +21,7 @@ class CameraInferenceService:
         camera_id: str,
         stream_url: str,
         database_service: dict,
-        face_identify_service: dict,
+        recognition_service: dict,
         shared_model: SharedDetectionModel,
         camera_name: Optional[str] = None,
         location: Optional[str] = None,
@@ -53,8 +53,8 @@ class CameraInferenceService:
         # Initialize services
         self.database_hostname = database_service["hostname"]
         self.database_port = database_service["port"]
-        self.face_identify_hostname = face_identify_service["hostname"]
-        self.face_identify_port = face_identify_service["port"]
+        self.recognition_hostname = recognition_service["hostname"]
+        self.recognition_port = recognition_service["port"]
 
         # Queue to store frames
         self.frame_queue = queue.Queue(maxsize=queue_size)
@@ -68,7 +68,7 @@ class CameraInferenceService:
             camera_id=config["camera_id"],
             stream_url=config["stream_url"],
             database_service=services["database_service"],
-            face_identify_service=services["face_identify_service"],
+            recognition_service=services["recognition_service"],
             shared_model=shared_model,
             camera_name=config.get("name"),
             location=config.get("location"),
@@ -146,7 +146,7 @@ class CameraInferenceService:
         2. Associate faces to persons (spatial matching)
         3. ByteTrack on person detections
         4. Match tracks → persons → faces
-        5. Send face_image + detect_image + origin_image to face_identify_service
+        5. Send face_image + detect_image + origin_image to recognition_service
         """
         detections = self.shared_model.detect(frame)
         person_dets = detections["persons"]
@@ -224,7 +224,7 @@ class CameraInferenceService:
 
                 # Send to face identification service
                 response = requests.post(
-                    f"http://{self.face_identify_hostname}:{self.face_identify_port}/face_identification",
+                    f"http://{self.recognition_hostname}:{self.recognition_port}/face_identification",
                     params={"detect_id": track_id, "camera_id": self.camera_id},
                     files=files,
                 )

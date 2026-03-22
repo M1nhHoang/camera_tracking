@@ -67,7 +67,7 @@ async def get_tracking_info(detect_id: int = -1):
         status_code=200, content={"user_name": user_name, "is_unknown": is_unknown}
     )
 
-    # return face_identify_service.get_name_by_detect_id(detect_id)
+    # return recognition_service.get_name_by_detect_id(detect_id)
 
 
 @router.get("/list")

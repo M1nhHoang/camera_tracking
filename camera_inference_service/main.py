@@ -13,7 +13,7 @@ app = FastAPI()
 # Service configurations
 services = {
     "database_service": {"hostname": "database_service", "port": "8003"},
-    "face_identify_service": {"hostname": "face_identify_service", "port": "8002"},
+    "recognition_service": {"hostname": "recognition_service", "port": "8002"},
 }
 
 # Shared model configuration (loaded once, shared across all cameras)
