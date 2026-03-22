@@ -1,10 +1,7 @@
-# built-in dependencies
 from typing import Any, Dict, List, Union
 
-# 3rd party dependencies
 import numpy as np
 
-# project dependencies
 from deepface.commons import image_utils
 from deepface.modules import modeling, preprocessing
 from deepface.models.FacialRecognition import FacialRecognition
@@ -12,100 +9,70 @@ from deepface.models.FacialRecognition import FacialRecognition
 
 def represent(
     img_path: Union[str, np.ndarray],
-    model_name: str = "VGG-Face",
-    normalization: str = "base",
+    model_name: str = "Facenet",
+    normalization: str = "Facenet",
     anti_spoofing: bool = False,
 ) -> List[Dict[str, Any]]:
-    """
-    Represent facial images as multi-dimensional vector embeddings.
-
-    Args:
-        img_path (str or np.ndarray): The exact path to the image, a numpy array in BGR format,
-            or a base64 encoded image. If the source image contains multiple faces, the result will
-            include information for each detected face.
-
-        model_name (str): Model for face recognition. Options: VGG-Face, Facenet, Facenet512,
-            OpenFace, DeepFace, DeepID, Dlib, ArcFace, SFace and GhostFaceNet
-
-        enforce_detection (boolean): If no face is detected in an image, raise an exception.
-            Default is True. Set to False to avoid the exception for low-resolution images.
-
-        detector_backend (string): face detector backend. Options: 'opencv', 'retinaface',
-            'mtcnn', 'ssd', 'dlib', 'mediapipe', 'yolov8', 'centerface' or 'skip'.
-
-        align (boolean): Perform alignment based on the eye positions.
-
-        expand_percentage (int): expand detected facial area with a percentage (default is 0).
-
-        normalization (string): Normalize the input image before feeding it to the model.
-            Default is base. Options: base, raw, Facenet, Facenet2018, VGGFace, VGGFace2, ArcFace
-
-        anti_spoofing (boolean): Flag to enable anti spoofing (default is False).
-
-    Returns:
-        results (List[Dict[str, Any]]): A list of dictionaries, each containing the
-            following fields:
-
-        - embedding (List[float]): Multidimensional vector representing facial features.
-            The number of dimensions varies based on the reference model
-            (e.g., FaceNet returns 128 dimensions, VGG-Face returns 4096 dimensions).
-        - facial_area (dict): Detected facial area by face detection in dictionary format.
-            Contains 'x' and 'y' as the left-corner point, and 'w' and 'h'
-            as the width and height. If `detector_backend` is set to 'skip', it represents
-            the full image area and is nonsensical.
-        - face_confidence (float): Confidence score of face detection. If `detector_backend` is set
-            to 'skip', the confidence will be 0 and is nonsensical.
-    """
-    resp_objs = []
-
+    """Generate embedding for a single image."""
     model: FacialRecognition = modeling.build_model(model_name)
-
-    # ---------------------------------
-    # we have run pre-process in verification. so, this can be skipped if it is coming from verify.
     target_size = model.input_shape
-    # Try load. If load error, will raise exception internal
-    img, _ = image_utils.load_image(img_path)
 
+    img, _ = image_utils.load_image(img_path)
     if len(img.shape) != 3:
         raise ValueError(f"Input img must be 3 dimensional but it is {img.shape}")
 
-    # make dummy region and confidence to keep compatibility with `extract_faces`
-    img_objs = [
-        {
-            "face": img,
-            "facial_area": {"x": 0, "y": 0, "w": img.shape[0], "h": img.shape[1]},
-            "confidence": 0,
-        }
-    ]
-    # ---------------------------------
+    # RGB to BGR
+    img = img[:, :, ::-1]
 
-    for img_obj in img_objs:
-        if anti_spoofing is True and img_obj.get("is_real", True) is False:
-            raise ValueError("Spoof detected in the given image.")
-        img = img_obj["face"]
+    # Resize and normalize
+    img = preprocessing.resize_image(img=img, target_size=(target_size[1], target_size[0]))
+    img = preprocessing.normalize_input(img=img, normalization=normalization)
 
-        # rgb to bgr
+    embedding = model.forward(img)
+
+    return [{"embedding": embedding, "facial_area": {}, "face_confidence": 0}]
+
+
+def represent_batch(
+    images: List[np.ndarray],
+    model_name: str = "Facenet",
+    normalization: str = "Facenet",
+) -> List[List[float]]:
+    """
+    Generate embeddings for a batch of images in a single forward pass.
+
+    Args:
+        images: list of numpy arrays (RGB/BGR)
+        model_name: model to use
+        normalization: normalization technique
+
+    Returns:
+        list of embedding vectors (list of floats)
+    """
+    if not images:
+        return []
+
+    model: FacialRecognition = modeling.build_model(model_name)
+    target_size = model.input_shape
+
+    # Preprocess all images
+    processed = []
+    for img in images:
+        if len(img.shape) != 3:
+            raise ValueError(f"Input img must be 3 dimensional but it is {img.shape}")
+
+        # RGB to BGR
         img = img[:, :, ::-1]
 
-        region = img_obj["facial_area"]
-        confidence = img_obj["confidence"]
-
-        # resize to expected shape of ml model
-        img = preprocessing.resize_image(
-            img=img,
-            # thanks to DeepId (!)
-            target_size=(target_size[1], target_size[0]),
-        )
-
-        # custom normalization
+        # Resize and normalize → shape (1, H, W, 3)
+        img = preprocessing.resize_image(img=img, target_size=(target_size[1], target_size[0]))
         img = preprocessing.normalize_input(img=img, normalization=normalization)
+        processed.append(img[0])  # Remove batch dim → (H, W, 3)
 
-        embedding = model.forward(img)
+    # Stack into batch tensor → (N, H, W, 3)
+    batch = np.stack(processed, axis=0)
 
-        resp_obj = {}
-        resp_obj["embedding"] = embedding
-        resp_obj["facial_area"] = region
-        resp_obj["face_confidence"] = confidence
-        resp_objs.append(resp_obj)
+    # Single forward pass → (N, 128)
+    embeddings = model.model(batch, training=False).numpy()
 
-    return resp_objs
+    return [row.tolist() for row in embeddings]

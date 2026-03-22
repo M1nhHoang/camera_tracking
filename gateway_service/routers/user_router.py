@@ -149,17 +149,11 @@ async def upload_user_images(
 ):
     """Upload new images for existing user"""
     try:
-        # Upload to database service first
         db_response = await service.upload_user_images(user_id, files)
-
-        # Process face embeddings for new images
-        identify_response = await service.process_user_images(
-            user_id, db_response["added_images"]
-        )
 
         return {
             "success": True,
-            "processed_images": len(db_response["added_images"]),
+            "processed_images": len(db_response.get("added_images", [])),
             "failed_images": 0,
         }
 

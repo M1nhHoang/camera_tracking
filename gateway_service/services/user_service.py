@@ -237,22 +237,6 @@ class UserService:
         # except Exception as e:
         #     raise ValueError(f"Error uploading images: {str(e)}")
 
-    async def process_user_images(self, user_id: str, image_paths: List[str]) -> Dict:
-        """Process images with recognition service"""
-        async with aiohttp.ClientSession() as session:
-            form = aiohttp.FormData()
-            form.add_field("user_id", user_id)
-            for path in image_paths:
-                form.add_field("image_paths", path)
-
-            async with session.post(
-                f"{self.recognition_url}/process_images", data=form
-            ) as response:
-                if response.status != 200:
-                    # Log error but don't fail
-                    print(f"Warning: Failed to process images: {await response.text()}")
-                return await response.json()
-
     async def get_user(self, user_id: str) -> Optional[Dict]:
         """Get user details by ID"""
         async with aiohttp.ClientSession() as session:

@@ -61,3 +61,24 @@ def represent(
         normalization=normalization,
         anti_spoofing=anti_spoofing,
     )
+
+
+def represent_batch(
+    images: List[np.ndarray],
+    model_name: str = "Facenet",
+    normalization: str = "Facenet",
+) -> List[List[float]]:
+    """
+    Generate embeddings for a batch of images in a single forward pass.
+
+    Args:
+        images: list of numpy arrays (RGB/BGR)
+
+    Returns:
+        list of embedding vectors
+    """
+    return representation.represent_batch(
+        images=images,
+        model_name=model_name,
+        normalization=normalization,
+    )

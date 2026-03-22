@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package embedding;
+
+service EmbeddingService {
+  // Generate face embedding from a single image
+  rpc GetEmbedding (EmbeddingRequest) returns (EmbeddingResponse);
+
+  // Generate embeddings for a batch of images in a single forward pass
+  rpc GetEmbeddingBatch (EmbeddingBatchRequest) returns (EmbeddingBatchResponse);
+}
+
+message EmbeddingRequest {
+  bytes face_image = 1;  // JPEG-encoded face crop
+}
+
+message EmbeddingResponse {
+  bool success = 1;
+  repeated float embedding = 2;  // 128-dim vector (Facenet)
+  string message = 3;
+}
+
+message EmbeddingBatchRequest {
+  repeated bytes face_images = 1;  // List of JPEG-encoded face crops
+}
+
+message EmbeddingBatchResponse {
+  bool success = 1;
+  repeated EmbeddingVector embeddings = 2;
+  string message = 3;
+}
+
+message EmbeddingVector {
+  repeated float values = 1;  // 128-dim vector
+}
