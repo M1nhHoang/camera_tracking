@@ -213,6 +213,7 @@ class FaceIdentifyService:
         detect_threshold=1,
         camera_id=None,
         force_update=False,
+        face_image=None,
     ):
         self.detect_queue.put(
             (
@@ -222,6 +223,7 @@ class FaceIdentifyService:
                 detect_threshold,
                 camera_id,
                 force_update,
+                face_image,
             )
         )
 
@@ -400,11 +402,13 @@ class FaceIdentifyService:
                 detect_threshold,
                 camera_id,
                 force_update,
+                face_image,
             ) = track_queue
 
-            # face detect
-            face_image = self.face_detect(detect_image, detect_id)
-            if face_image == [] or face_image is None:
+            # Use pre-cropped face if provided, otherwise detect face locally
+            if face_image is None:
+                face_image = self.face_detect(detect_image, detect_id)
+            if face_image is None or (isinstance(face_image, list) and len(face_image) == 0):
                 # Mark the queue task as done
                 self.detect_queue.task_done()
                 continue

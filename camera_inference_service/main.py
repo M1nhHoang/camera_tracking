@@ -6,7 +6,7 @@ from starlette.responses import StreamingResponse
 from typing import Dict, Optional
 from pydantic import BaseModel
 
-from service import CameraInferenceService
+from service import CameraInferenceService, SharedDetectionModel, DetectionConfig
 
 app = FastAPI()
 
@@ -15,7 +15,16 @@ services = {
     "database_service": {"hostname": "database_service", "port": "8003"},
     "face_identify_service": {"hostname": "face_identify_service", "port": "8002"},
 }
-model_path = "weights/yolo8n_human_detect.pt"
+
+# Shared model configuration (loaded once, shared across all cameras)
+model_config = DetectionConfig(
+    model_path="weights/yolo_person_face.pt",
+    person_conf_threshold=0.5,
+    face_conf_threshold=0.5,
+    person_class_id=0,
+    face_class_id=1,
+)
+shared_model = SharedDetectionModel.get_instance(model_config)
 
 # Store camera services
 camera_services = {}
@@ -52,7 +61,7 @@ async def initialize_cameras():
 
                 # Create and store camera service
                 service = CameraInferenceService.create_from_config(
-                    config=config.model_dump(), services=services, model_path=model_path
+                    config=config.model_dump(), services=services, shared_model=shared_model
                 )
                 camera_services[camera["id"]] = service
 
@@ -80,7 +89,7 @@ async def add_camera(config: CameraConfig):
     try:
         # Create camera service
         service = CameraInferenceService.create_from_config(
-            config=config.model_dump(), services=services, model_path=model_path
+            config=config.model_dump(), services=services, shared_model=shared_model
         )
 
         camera_services[config.camera_id] = service

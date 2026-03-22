@@ -4,31 +4,15 @@ import torch
 import queue
 import requests
 import threading
-from enum import Enum
-from typing import Optional, Generator
+from typing import Optional, Generator, List, Dict
 
 from PIL import Image
 from io import BytesIO
-from ultralytics import YOLO
-from dataclasses import dataclass
 from yolox.tracker.byte_tracker import BYTETracker, STrack
 
-
-class CameraStatus(Enum):
-    OFFLINE = "offline"
-    STREAMING = "streaming"
-    PAUSED = "paused"
-    ERROR = "error"
-
-
-@dataclass(frozen=True)
-class BYTETrackerArgs:
-    track_thresh: float = 0.25
-    track_buffer: int = 60
-    match_thresh: float = 0.9
-    aspect_ratio_thresh: float = 3.0
-    min_box_area: float = 1.0
-    mot20: bool = False
+from service.config import CameraStatus, BYTETrackerArgs
+from service.detection_model import SharedDetectionModel
+from service.association import associate_faces_to_persons, compute_iou
 
 
 class CameraInferenceService:
@@ -38,7 +22,7 @@ class CameraInferenceService:
         stream_url: str,
         database_service: dict,
         face_identify_service: dict,
-        model_path: str,
+        shared_model: SharedDetectionModel,
         camera_name: Optional[str] = None,
         location: Optional[str] = None,
         optimal_width: int = 640,
@@ -59,9 +43,11 @@ class CameraInferenceService:
         self._stop_flag = False
         self._cap = None
 
-        # init detect model
-        self.model = YOLO(model_path)
+        # Shared model (singleton, loaded once for all cameras)
+        self.shared_model = shared_model
         self.conf_threshold = conf_threshold
+
+        # ByteTrack is per-camera (tracks are camera-specific)
         self.byte_tracker = BYTETracker(BYTETrackerArgs())
 
         # Initialize services
@@ -74,14 +60,16 @@ class CameraInferenceService:
         self.frame_queue = queue.Queue(maxsize=queue_size)
 
     @classmethod
-    def create_from_config(cls, config: dict, services: dict, model_path: str):
-        """Create instance from config dictionary"""
+    def create_from_config(
+        cls, config: dict, services: dict, shared_model: SharedDetectionModel
+    ):
+        """Create instance from config dictionary."""
         return cls(
             camera_id=config["camera_id"],
             stream_url=config["stream_url"],
             database_service=services["database_service"],
             face_identify_service=services["face_identify_service"],
-            model_path=model_path,
+            shared_model=shared_model,
             camera_name=config.get("name"),
             location=config.get("location"),
             optimal_width=config.get("optimal_width", 640),
@@ -124,80 +112,136 @@ class CameraInferenceService:
             print(f"Error getting tracking info: {e}")
         return None
 
-    def human_detect_and_track(self, frame):
-        """Detect and track humans in frame"""
-        results = self.model(frame)
-        detections = []
+    def _match_track_to_face(
+        self,
+        track_tlbr,
+        person_dets: List[list],
+        face_associations: Dict[int, Optional[list]],
+    ) -> Optional[list]:
+        """
+        Match a ByteTrack track back to original person detections,
+        then return the associated face bbox (if any).
+
+        ByteTrack may smooth/reorder bboxes, so we use IoU matching
+        to find which original person detection this track corresponds to.
+        """
+        best_iou = 0.0
+        best_idx = -1
+
+        for i, det in enumerate(person_dets):
+            iou = compute_iou(track_tlbr, det)
+            if iou > best_iou:
+                best_iou = iou
+                best_idx = i
+
+        if best_idx >= 0 and best_iou > 0.5:
+            return face_associations.get(best_idx)
+
+        return None
+
+    def detect_and_track(self, frame):
+        """
+        Unified detection and tracking pipeline:
+        1. Single-pass YOLO inference → persons + faces
+        2. Associate faces to persons (spatial matching)
+        3. ByteTrack on person detections
+        4. Match tracks → persons → faces
+        5. Send face_image + detect_image + origin_image to face_identify_service
+        """
+        detections = self.shared_model.detect(frame)
+        person_dets = detections["persons"]
+        face_dets = detections["faces"]
         draw_reg_list = []
 
-        for result in results:
-            boxes = result.boxes
-            for box in boxes:
-                cls = int(box.cls[0])
-                conf = box.conf[0]
-                if cls == 0 and conf > self.conf_threshold:
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    detections.append([x1, y1, x2, y2, conf])
+        if not person_dets:
+            return frame, draw_reg_list
 
-        if detections:
-            detections_tensor = torch.tensor(detections).float().cpu().numpy()
-            tracks = self.byte_tracker.update(
-                detections_tensor,
-                [frame.shape[0], frame.shape[1]],
-                [frame.shape[0], frame.shape[1]],
-            )
+        # Associate faces to persons before tracking
+        face_associations = associate_faces_to_persons(person_dets, face_dets)
 
-            for track in tracks:
-                try:
-                    # Get track data
-                    x1, y1, x2, y2 = map(int, track.tlbr)
-                    track_id = track.track_id
+        # ByteTrack on person detections
+        detections_tensor = torch.tensor(person_dets).float().cpu().numpy()
+        tracks = self.byte_tracker.update(
+            detections_tensor,
+            [frame.shape[0], frame.shape[1]],
+            [frame.shape[0], frame.shape[1]],
+        )
 
-                    # Crop human image
-                    cropped_human = frame[y1:y2, x1:x2]
-                    if cropped_human.size == 0:
-                        continue
+        for track in tracks:
+            try:
+                x1, y1, x2, y2 = map(int, track.tlbr)
+                track_id = track.track_id
 
-                    # Convert images to bytes
-                    image_bytes = BytesIO()
-                    Image.fromarray(cropped_human).save(image_bytes, format="JPEG")
-                    detect_image_bytes = image_bytes.getvalue()
-
-                    image_bytes = BytesIO()
-                    Image.fromarray(frame).save(image_bytes, format="JPEG")
-                    origin_image_bytes = image_bytes.getvalue()
-
-                    # Send to face identification service
-                    response = requests.post(
-                        f"http://{self.face_identify_hostname}:{self.face_identify_port}/face_identification",
-                        params={"detect_id": track_id, "camera_id": self.camera_id},
-                        files={
-                            "origin_image": (
-                                "origin_image.jpg",
-                                origin_image_bytes,
-                                "image/jpeg",
-                            ),
-                            "detect_image": (
-                                "detect_image.jpg",
-                                detect_image_bytes,
-                                "image/jpeg",
-                            ),
-                        },
-                    )
-
-                    # Get tracking info
-                    tracking_info = self.get_tracking_info(track_id)
-                    label = (
-                        tracking_info.get("user_name", "Unknown")
-                        if tracking_info
-                        else "Unknown"
-                    )
-
-                    draw_reg_list.append((x1, y1, x2, y2, label))
-
-                except Exception as e:
-                    print(f"Error processing track {track_id}: {e}")
+                # Crop person image
+                cropped_human = frame[y1:y2, x1:x2]
+                if cropped_human.size == 0:
                     continue
+
+                # Match track to associated face
+                matched_face_bbox = self._match_track_to_face(
+                    track.tlbr, person_dets, face_associations
+                )
+
+                # Crop face image if associated
+                face_image_bytes = None
+                if matched_face_bbox is not None:
+                    fx1, fy1, fx2, fy2 = map(int, matched_face_bbox[:4])
+                    cropped_face = frame[fy1:fy2, fx1:fx2]
+                    if cropped_face.size > 0:
+                        buf = BytesIO()
+                        Image.fromarray(cropped_face).save(buf, format="JPEG")
+                        face_image_bytes = buf.getvalue()
+
+                # Convert person crop to bytes
+                buf = BytesIO()
+                Image.fromarray(cropped_human).save(buf, format="JPEG")
+                detect_image_bytes = buf.getvalue()
+
+                # Convert full frame to bytes
+                buf = BytesIO()
+                Image.fromarray(frame).save(buf, format="JPEG")
+                origin_image_bytes = buf.getvalue()
+
+                # Build request files
+                files = {
+                    "origin_image": (
+                        "origin_image.jpg",
+                        origin_image_bytes,
+                        "image/jpeg",
+                    ),
+                    "detect_image": (
+                        "detect_image.jpg",
+                        detect_image_bytes,
+                        "image/jpeg",
+                    ),
+                }
+                if face_image_bytes is not None:
+                    files["face_image"] = (
+                        "face_image.jpg",
+                        face_image_bytes,
+                        "image/jpeg",
+                    )
+
+                # Send to face identification service
+                response = requests.post(
+                    f"http://{self.face_identify_hostname}:{self.face_identify_port}/face_identification",
+                    params={"detect_id": track_id, "camera_id": self.camera_id},
+                    files=files,
+                )
+
+                # Get tracking info for label
+                tracking_info = self.get_tracking_info(track_id)
+                label = (
+                    tracking_info.get("user_name", "Unknown")
+                    if tracking_info
+                    else "Unknown"
+                )
+
+                draw_reg_list.append((x1, y1, x2, y2, label))
+
+            except Exception as e:
+                print(f"Error processing track {track_id}: {e}")
+                continue
 
         return frame, draw_reg_list
 
@@ -223,8 +267,8 @@ class CameraInferenceService:
 
                 error_count = 0  # Reset error count on successful frame read
 
-                # Detect and track humans
-                frame, draw_reg_list = self.human_detect_and_track(frame)
+                # Unified detect and track (person + face in single pass)
+                frame, draw_reg_list = self.detect_and_track(frame)
 
                 # Calculate FPS
                 current_time = time.time()

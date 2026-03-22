@@ -30,6 +30,7 @@ face_identify_service = FaceIdentifyService(
 async def face_identification(
     origin_image: UploadFile = File(...),
     detect_image: UploadFile = File(...),
+    face_image: Optional[UploadFile] = File(None),
     detect_id: int = -1,
     camera_id: Optional[str] = None,
 ):
@@ -45,8 +46,15 @@ async def face_identification(
     origin_image = np.array(origin_image)
     detect_image = np.array(detect_image)
 
+    # Pre-cropped face from camera_inference_service (if available)
+    face_image_arr = None
+    if face_image is not None:
+        face_image_arr = Image.open(BytesIO(await face_image.read()))
+        face_image_arr = np.array(face_image_arr.convert("RGB"))
+
     face_identify_service.process_detect_queue(
-        detect_id, origin_image, detect_image, camera_id=camera_id
+        detect_id, origin_image, detect_image, camera_id=camera_id,
+        face_image=face_image_arr,
     )
 
     return {"success": True}
