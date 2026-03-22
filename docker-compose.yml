@@ -1,20 +1,7 @@
 version: '3.8'
 
 services:
-  database_service:
-    build:
-      context: .
-      dockerfile: Dockerfile.database
-    image: database
-    container_name: database_service
-    networks:
-      - camera_track_network
-    volumes:
-      - ./database_service:/database_service
-      - ./_static_files:/static_files
-    ports:
-      - "8003:8003"
-    command: ["python3", "main.py"]
+  # --- Infrastructure ---
 
   mongo_db:
     image: mongo
@@ -36,9 +23,88 @@ services:
     volumes:
       - ./_data/chroma_data:/chroma/chroma
 
+  # --- AI Services ---
+
+  detection_service:
+    build:
+      context: .
+      dockerfile: Dockerfile.detection
+    image: detection
+    container_name: detection_service
+    runtime: nvidia
+    networks:
+      - camera_track_network
+    volumes:
+      - ./detection_service:/detection_service
+    ports:
+      - "5000:5000"
+    depends_on:
+      - recognition_service
+    command: ["python3", "main.py"]
+
+  recognition_service:
+    build:
+      context: .
+      dockerfile: Dockerfile.recognition
+    image: recognition
+    container_name: recognition_service
+    networks:
+      - camera_track_network
+    volumes:
+      - ./static_files:/static_files
+    ports:
+      - "8002:8002"
+      - "50051:50051"
+    depends_on:
+      - mongo_db
+      - chroma_db
+      - face_embedding_service
+    command: ["python3", "main.py"]
+
+  face_embedding_service:
+    build:
+      context: .
+      dockerfile: Dockerfile.face_embedding
+    image: face_embedding
+    container_name: face_embedding_service
+    runtime: nvidia
+    networks:
+      - camera_track_network
+    volumes:
+      - ./_data/deepface_weights:/root/.deepface/weights
+    ports:
+      - "8001:8001"
+      - "50052:50052"
+    command: ["python3", "main.py"]
+
+  # --- Backend ---
+
+  backend_service:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: backend
+    container_name: backend_service
+    networks:
+      - camera_track_network
+    volumes:
+      - ./static_files:/static_files
+    ports:
+      - "80:80"
+    depends_on:
+      - mongo_db
+      - detection_service
+      - recognition_service
+    command: ["python", "main.py"]
+
+  # NOTE: database_service has been removed.
+  # - Tracking logs: handled directly by recognition_service → MongoDB
+  # - User management: will be handled by backend_service (TODO #14)
+  # - Camera CRUD: will be handled by backend_service (TODO #14)
+
 networks:
   camera_track_network:
     external: true
 
 # docker-compose build --no-cache
-# docker-compose up 
+# docker-compose up

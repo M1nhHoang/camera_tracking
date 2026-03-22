@@ -7,8 +7,8 @@ from router.cameras import router as cameras_router, init_router, CameraConfig
 
 app = FastAPI()
 
-# Database service URL (only used for camera list at startup)
-DATABASE_URL = "http://database_service:8003"
+# Backend service URL (only used for camera list at startup)
+BACKEND_URL = "http://backend_service:80"
 
 # Shared model configuration (loaded once, shared across all cameras)
 model_config = DetectionConfig(
@@ -36,7 +36,7 @@ app.include_router(cameras_router, prefix="/cameras", tags=["cameras"])
 async def initialize_cameras():
     """Initialize cameras from database when service starts"""
     try:
-        response = requests.get(f"{DATABASE_URL}/cameras/list")
+        response = requests.get(f"{BACKEND_URL}/cameras/list")
 
         if response.status_code == 200:
             cameras = response.json()

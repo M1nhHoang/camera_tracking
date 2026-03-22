@@ -1,0 +1,14 @@
+FROM python:3.10-slim
+
+WORKDIR /backend_service
+
+COPY backend_service/ .
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+EXPOSE 80
+
+CMD ["python", "main.py"]
+
+# docker build -t backend . -f Dockerfile.backend
+# docker run -it --name backend_service --net camera_track_network -v ./static_files:/static_files -p 80:80 backend
