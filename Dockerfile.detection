@@ -1,0 +1,38 @@
+FROM camera_track_env
+
+RUN apt-get install -y \
+    protobuf-compiler \
+    cmake
+
+# cd to folder
+WORKDIR /detection_service
+
+# setup file
+COPY detection_service/ .
+
+# install requirement
+RUN pip install --no-cache-dir -r requirements.txt
+
+# ByteTrack is great tracker but suck in yolo8 :))
+WORKDIR /detection_service/ByteTrack
+RUN sed -i 's/onnxruntime==1.8.0/onnxruntime>=1.12.0/g' requirements.txt
+RUN pip3 install -q -r requirements.txt
+RUN python3 setup.py -q develop
+RUN pip install -q cython_bbox
+RUN pip install -q onemetric
+RUN pip install -q loguru lap thop
+RUN pip3 install protobuf>=4.25.0
+
+# back to main dir
+WORKDIR /detection_service
+
+# start app
+# CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 5000 --reload"]
+CMD ["python3", "main.py"]
+
+### build this service
+# build docker image
+## docker build -t detection . -f Dockerfile.detection
+
+# build and run
+## docker run --gpus all -it --name detection_service --net camera_track_network -v D:\camera\data\demo\detection_service:/detection_service -p 5000:5000 detection

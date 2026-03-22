@@ -17,5 +17,5 @@ CMD ["python3", "main.py"]
 # build docker image
 ## docker build -t face_embedding . -f Dockerfile.face_embedding
 
-# build and run
-## docker run --gpus all -it --name face_embedding_service --net camera_track_network -v D:\camera\data\demo\face_embedding_service:/face_embedding_service -p 8001:8001 face_embedding
+# build and run (mount weights volume to persist model downloads)
+## docker run --gpus all -it --name face_embedding_service --net camera_track_network -v D:\camera\data\demo\face_embedding_service:/face_embedding_service -v ./_data/deepface_weights:/root/.deepface/weights -p 8001:8001 face_embedding

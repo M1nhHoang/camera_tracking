@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 class CameraService:
     def __init__(self):
         self.database_url = settings.DATABASE_SERVICE_URL
-        self.camera_inference_url = settings.CAMERA_INFERENCE_SERVICE_URL
+        self.detection_url = settings.DETECTION_SERVICE_URL
 
     async def add_camera(self, camera_data: Dict) -> str:
         """Add new camera"""
@@ -35,7 +35,7 @@ class CameraService:
                     camera_id = db_result["camera_id"]
                     logger.info(f"Camera added to database with ID: {camera_id}")
 
-                # Then register with inference service
+                # Then register with detection service
                 camera_config = {
                     "camera_id": camera_id,
                     "name": camera_data["name"],
@@ -47,7 +47,7 @@ class CameraService:
                 }
 
                 async with session.post(
-                    f"{self.camera_inference_url}/cameras/add", json=camera_config
+                    f"{self.detection_url}/cameras/add", json=camera_config
                 ) as response:
                     if response.status != 200:
                         # Log error and try to rollback
@@ -58,14 +58,14 @@ class CameraService:
                         except Exception as e:
                             logger.error(f"Rollback failed: {str(e)}")
                         raise Exception(
-                            f"Failed to initialize camera in inference service: {error_text}"
+                            f"Failed to initialize camera in detection service: {error_text}"
                         )
 
-                    logger.info(f"Camera initialized in inference service: {camera_id}")
+                    logger.info(f"Camera initialized in detection service: {camera_id}")
 
                 # Start the camera
                 async with session.post(
-                    f"{self.camera_inference_url}/cameras/{camera_id}/start"
+                    f"{self.detection_url}/cameras/{camera_id}/start"
                 ) as response:
                     if response.status != 200:
                         logger.warning(f"Failed to start camera: {camera_id}")
@@ -101,9 +101,9 @@ class CameraService:
                         return None
                     camera = await response.json()
 
-                # Get camera status from inference service
+                # Get camera status from detection service
                 async with session.get(
-                    f"{self.camera_inference_url}/cameras/{camera_id}/status"
+                    f"{self.detection_url}/cameras/{camera_id}/status"
                 ) as response:
                     if response.status == 200:
                         status_data = await response.json()
@@ -121,23 +121,23 @@ class CameraService:
         """Delete camera"""
         try:
             async with aiohttp.ClientSession() as session:
-                # First stop and delete from inference service
+                # First stop and delete from detection service
                 try:
                     # Stop camera first
                     await session.post(
-                        f"{self.camera_inference_url}/cameras/{camera_id}/stop"
+                        f"{self.detection_url}/cameras/{camera_id}/stop"
                     )
 
-                    # Then delete from inference service
+                    # Then delete from detection service
                     async with session.delete(
-                        f"{self.camera_inference_url}/cameras/{camera_id}"
+                        f"{self.detection_url}/cameras/{camera_id}"
                     ) as response:
                         if response.status != 200:
                             logger.warning(
-                                f"Failed to delete from inference service: {await response.text()}"
+                                f"Failed to delete from detection service: {await response.text()}"
                             )
                 except Exception as e:
-                    logger.warning(f"Error deleting from inference service: {str(e)}")
+                    logger.warning(f"Error deleting from detection service: {str(e)}")
 
                 # Then delete from database
                 async with session.delete(
@@ -158,7 +158,7 @@ class CameraService:
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f"{self.camera_inference_url}/cameras/{camera_id}/start"
+                    f"{self.detection_url}/cameras/{camera_id}/start"
                 ) as response:
                     if response.status != 200:
                         error_text = await response.text()
@@ -180,7 +180,7 @@ class CameraService:
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    f"{self.camera_inference_url}/cameras/{camera_id}/stop"
+                    f"{self.detection_url}/cameras/{camera_id}/stop"
                 ) as response:
                     if response.status != 200:
                         error_text = await response.text()
@@ -209,7 +209,7 @@ class CameraService:
                     raise Exception("Camera is not streaming")
 
                 async with session.get(
-                    f"{self.camera_inference_url}/cameras/{camera_id}/stream",
+                    f"{self.detection_url}/cameras/{camera_id}/stream",
                     timeout=None,
                 ) as response:
                     if response.status != 200:

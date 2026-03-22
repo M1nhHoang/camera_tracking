@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/minhhoang/Desktop/camera_tracking -name *.json -o -name .env*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebSearch",
+      "WebFetch(domain:sefiks.com)",
+      "Bash(find /c/Users/minhhoang/Desktop/camera_tracking -name *.pt -o -name weights -type d)",
+      "Bash(wc -l /c/Users/minhhoang/Desktop/camera_tracking/database_service/service/*.py)",
+      "Bash(pip install:*)",
+      "Bash(bash protos/generate.sh)",
+      "Bash(python -m grpc_tools.protoc -I protos --python_out=camera_inference_service/generated --grpc_python_out=camera_inference_service/generated protos/recognition.proto)",
+      "Bash(xargs wc:*)",
+      "Bash(wc -l /c/Users/minhhoang/Desktop/camera_tracking/face_embedding_service/deepface/basemodels/*.py)",
+      "Bash(du -sh /c/Users/minhhoang/Desktop/camera_tracking/face_embedding_service/deepface/basemodels/*.py)"
+    ]
+  }
+}

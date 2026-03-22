@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     DATABASE_SERVICE_URL: str = "http://database_service:8003"
     RECOGNITION_SERVICE_URL: str = "http://recognition_service:8002"
     FACE_EMBEDDING_SERVICE_URL: str = "http://face_embedding_service:8001"
-    CAMERA_INFERENCE_SERVICE_URL: str = "http://camera_inference_service:5000"
+    DETECTION_SERVICE_URL: str = "http://detection_service:5000"
 
     # Static files URL for database service
     DATABASE_STATIC_URL: str = "http://database_service:8003/static"

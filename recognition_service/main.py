@@ -1,3 +1,5 @@
+import logging
+import threading
 import uvicorn
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.responses import JSONResponse
@@ -8,6 +10,7 @@ from PIL import Image
 from io import BytesIO
 
 from service import RecognitionService
+from grpc_server import start_grpc_server
 
 app = FastAPI()
 
@@ -23,6 +26,14 @@ recognition_service = RecognitionService(
     vector_db_service=vector_db_service,
     model_path=model_path,
 )
+
+# Start gRPC server alongside FastAPI (port 50051)
+grpc_thread = threading.Thread(
+    target=start_grpc_server,
+    args=(recognition_service,),
+    daemon=True,
+)
+grpc_thread.start()
 
 
 # Existing endpoints
@@ -46,7 +57,7 @@ async def face_identification(
     origin_image = np.array(origin_image)
     detect_image = np.array(detect_image)
 
-    # Pre-cropped face from camera_inference_service (if available)
+    # Pre-cropped face from detection_service (if available)
     face_image_arr = None
     if face_image is not None:
         face_image_arr = Image.open(BytesIO(await face_image.read()))

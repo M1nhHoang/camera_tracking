@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package recognition;
+
+service RecognitionService {
+  // Fire-and-forget face identification
+  // Camera sends images, recognition queues them and returns immediately
+  rpc IdentifyFace (FaceIdentificationRequest) returns (FaceIdentificationResponse);
+}
+
+message FaceIdentificationRequest {
+  int32 detect_id = 1;
+  string camera_id = 2;
+  bytes origin_image = 3;    // JPEG-encoded full frame
+  bytes detect_image = 4;    // JPEG-encoded person crop
+  bytes face_image = 5;      // JPEG-encoded face crop (empty bytes = not available)
+}
+
+message FaceIdentificationResponse {
+  bool success = 1;
+  string message = 2;
+}

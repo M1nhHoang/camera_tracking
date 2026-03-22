@@ -56,18 +56,6 @@ class FaceNet128dClient(FacialRecognition):
         self.output_shape = 128
 
 
-class FaceNet512dClient(FacialRecognition):
-    """
-    FaceNet-1512d model class
-    """
-
-    def __init__(self):
-        self.model = load_facenet512d_model()
-        self.model_name = "FaceNet-512d"
-        self.input_shape = (160, 160)
-        self.output_shape = 512
-
-
 def scaling(x, scale):
     return x * scale
 
@@ -2307,31 +2295,3 @@ def load_facenet128d_model(
     return model
 
 
-def load_facenet512d_model(
-    url="https://github.com/serengil/deepface_models/releases/download/v1.0/facenet512_weights.h5",
-) -> Model:
-    """
-    Construct FaceNet-512d model, download its weights and load
-    Returns:
-        model (Model)
-    """
-
-    model = InceptionResNetV1(dimension=512)
-
-    # -------------------------
-
-    home = folder_utils.get_deepface_home()
-
-    if os.path.isfile(home + "/.deepface/weights/facenet512_weights.h5") != True:
-        logger.info("facenet512_weights.h5 will be downloaded...")
-
-        output = home + "/.deepface/weights/facenet512_weights.h5"
-        gdown.download(url, output, quiet=False)
-
-    # -------------------------
-
-    model.load_weights(home + "/.deepface/weights/facenet512_weights.h5")
-
-    # -------------------------
-
-    return model

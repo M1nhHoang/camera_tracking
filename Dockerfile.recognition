@@ -9,6 +9,9 @@ COPY recognition_service/ .
 # install requirement
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Expose HTTP (FastAPI) and gRPC ports
+EXPOSE 8002 50051
+
 # start app
 # CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 8002 --reload"]
 CMD ["python3", "main.py"]
@@ -25,4 +28,4 @@ CMD ["python3", "main.py"]
 ## docker build -t recognition . -f Dockerfile.recognition
 
 # build and run
-## docker run --gpus all -it --name recognition_service --net camera_track_network -v D:\camera\data\demo\recognition_service:/recognition_service -p 8002:8002 recognition
+## docker run --gpus all -it --name recognition_service --net camera_track_network -v D:\camera\data\demo\recognition_service:/recognition_service -p 8002:8002 -p 50051:50051 recognition

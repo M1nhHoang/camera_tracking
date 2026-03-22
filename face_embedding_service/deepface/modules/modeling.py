@@ -1,33 +1,20 @@
-# built-in dependencies
 from typing import Any
 
-# project dependencies
-from deepface.basemodels import VGGFace
+from deepface.basemodels import Facenet
 
 
 def build_model(model_name: str) -> Any:
-    """
-    This function builds a deepface model
-    Parameters:
-            model_name (string): face recognition or facial attribute model
-                    VGG-Face, Facenet, OpenFace, DeepFace, DeepID for face recognition
-                    Age, Gender, Emotion, Race for facial attributes
-
-    Returns:
-            built model class
-    """
-
-    # singleton design pattern
+    """Build and cache a deepface model (singleton pattern)."""
     global model_obj
 
     models = {
-        "VGG-Face": VGGFace.VggFaceClient,
+        "Facenet": Facenet.FaceNet128dClient,
     }
 
-    if not "model_obj" in globals():
+    if "model_obj" not in globals():
         model_obj = {}
 
-    if not model_name in model_obj.keys():
+    if model_name not in model_obj:
         model = models.get(model_name)
         if model:
             model_obj[model_name] = model()

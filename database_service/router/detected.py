@@ -25,10 +25,8 @@ async def tracking(
         "truth_image_path": "",
         "distance": 0,
         "camera_id": None,
-        "force_update": False,
     },
 ):
-    # init
     user_id = traking_data.get("user_id", None)
     camera_id = traking_data.get("camera_id", None)
     detect_id = traking_data["detect_id"]
@@ -37,9 +35,7 @@ async def tracking(
     face_image = traking_data["face_image"]
     truth_image_path = traking_data["truth_image_path"]
     distance = traking_data["distance"]
-    force_update = traking_data.get("force_update", False)
 
-    # traking
     detected_service.traking(
         detect_id,
         origin_image,
@@ -47,7 +43,6 @@ async def tracking(
         face_image,
         truth_image_path,
         distance,
-        force_update,
         user_id=user_id,
         camera_id=camera_id,
     )

@@ -26,7 +26,6 @@ class DetectedService:
         face_image,
         truth_image_path,
         distance,
-        force_update,
         camera_id=None,
         user_id=None,
     ):
@@ -52,58 +51,55 @@ class DetectedService:
         if existing_record:
             unknow_user_id = UserService().get_unknown_user_id()
 
-            # check is detect user
-            if existing_record["user_id"] != unknow_user_id:
-                return None
-
-            # get image path
+            # Determine if we should override:
+            # 1. Better face image quality (sharper)
+            # 2. Better identification (lower distance = more confident match)
             old_face_image_path = existing_record["face_image_path"]
-            old_origin_image_path = existing_record["origin_image_path"]
-            old_detect_image_path = existing_record["detect_image_path"]
-
-            # read image from path
             old_face_image = cv2.imread(f"/{self.static_files}/{old_face_image_path}")
 
-            # Is better quality
-            if is_better_quality(face_image, old_face_image) or force_update:
-                # overwrite image
-                save_image_to_folder(
-                    face_image, self.static_files, path=old_face_image_path
-                )
-                save_image_to_folder(
-                    origin_image, self.static_files, path=old_origin_image_path
-                )
-                save_image_to_folder(
-                    detect_image, self.static_files, path=old_detect_image_path
-                )
+            has_better_image = is_better_quality(face_image, old_face_image)
+            old_distance = existing_record.get("distance", float("inf"))
+            has_better_match = distance < old_distance
+
+            if has_better_image or has_better_match:
+                # Override images with better quality shots
+                old_origin_image_path = existing_record["origin_image_path"]
+                old_detect_image_path = existing_record["detect_image_path"]
+
+                if has_better_image:
+                    save_image_to_folder(
+                        face_image, self.static_files, path=old_face_image_path
+                    )
+                    save_image_to_folder(
+                        origin_image, self.static_files, path=old_origin_image_path
+                    )
+                    save_image_to_folder(
+                        detect_image, self.static_files, path=old_detect_image_path
+                    )
+
+                # Update identification if better match
+                update_data = {
+                    "time_stamp": current_time,
+                }
+                if has_better_match:
+                    update_data["user_id"] = ObjectId(user_id) if user_id else unknow_user_id
+                    update_data["distance"] = distance
+                    update_data["truth_image_path"] = truth_image_path
+                if camera_id:
+                    update_data["camera_id"] = ObjectId(camera_id)
 
                 self.db_manager.update_one(
-                    {"detect_id": tracking_id},
-                    {
-                        "user_id": ObjectId(user_id) if user_id else unknow_user_id,
-                        "camera_id": ObjectId(camera_id) if camera_id else None,
-                        "guess_uesr_id": ObjectId(
-                            unknow_user_id
-                        ),  # update later, save as similar user face
-                        "distance": distance,
-                        "time_stamp": current_time,
-                    },
+                    {"detect_id": tracking_id}, update_data
                 )
 
         else:
-            # save new record
+            # Save new record
+            unknow_user_id = UserService().get_unknown_user_id()
             self.db_manager.insert_one(
                 {
                     "detect_id": tracking_id,
-                    "user_id": (
-                        ObjectId(user_id)
-                        if user_id
-                        else UserService().get_unknown_user_id()
-                    ),
+                    "user_id": ObjectId(user_id) if user_id else unknow_user_id,
                     "camera_id": ObjectId(camera_id) if camera_id else None,
-                    "guess_uesr_id": ObjectId(
-                        UserService().get_unknown_user_id()
-                    ),  # update later, save as similar user face
                     "face_image_path": save_image_to_folder(
                         face_image, self.static_files
                     ),

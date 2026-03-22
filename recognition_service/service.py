@@ -210,9 +210,8 @@ class RecognitionService:
         detect_id,
         origin_image,
         detect_image,
-        detect_threshold=1,
+        detect_threshold=0.40,
         camera_id=None,
-        force_update=False,
         face_image=None,
     ):
         self.detect_queue.put(
@@ -222,7 +221,6 @@ class RecognitionService:
                 detect_image,
                 detect_threshold,
                 camera_id,
-                force_update,
                 face_image,
             )
         )
@@ -401,7 +399,6 @@ class RecognitionService:
                 detect_image,
                 detect_threshold,
                 camera_id,
-                force_update,
                 face_image,
             ) = track_queue
 
@@ -429,7 +426,8 @@ class RecognitionService:
             distances = sreach_results["distances"][0][0]
             metadata = sreach_results["metadatas"][0][0]
 
-            # perform frame traking
+            # Send tracking data to database
+            # Database decides whether to override based on image quality + distance
             tracking_data = {
                 "user_id": (
                     metadata["user_id"] if distances < detect_threshold else None
@@ -441,7 +439,6 @@ class RecognitionService:
                 "face_image": self.convert_image_to_base64(face_image),
                 "truth_image_path": metadata["truth_image_path"],
                 "distance": distances,
-                "force_update": distances < detect_threshold,
             }
             response = requests.post(
                 f"http://{self.database_name}:{self.database_port}/detected/tracking",
